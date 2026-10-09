@@ -118,7 +118,17 @@ web chat ──/v1/chat──▶ CopilotChatService ──▶ Gemini (read-only 
    ruff check .
    ```
 
-The chat API contract for the UI is in [docs/API.md](docs/API.md).
+## Documentation
+
+| Doc | What's in it |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, process model, request flow, 021 gateway, market data, candles, contracts (with diagrams) |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Architecture decision records (why the LLM can't send, one worker, no order retries, …) |
+| [docs/SECURITY.md](docs/SECURITY.md) | Threat model and controls, each marked built or planned |
+| [docs/API.md](docs/API.md) | Chat API contract for the UI |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Environment variables, start-up, health checks, troubleshooting |
+| [docs/TESTING.md](docs/TESTING.md) | Fake 021 and fault injection, coverage map, phase exit criteria |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Phases 2–5, owners and team seams |
 
 ## Known limitations
 

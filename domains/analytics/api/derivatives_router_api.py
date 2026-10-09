@@ -21,7 +21,7 @@ from shared.utils.symbol_validator import SymbolValidator
 from shared.infrastructure.redis_client import get_redis_client
 from shared.constants import RedisKeys
 from domains.analytics.application.dto.read_models_dto import OptionChainSummaryDTO, compute_pcr
-from domains.analytics.api.schemas import DerivativesResponse, PricedStrike, TechnicalsResponse
+from domains.analytics.api.schemas import DerivativesResponse, TechnicalsResponse
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +47,7 @@ def _error_envelope(*, error: str, code: str, details=None) -> dict:
 @router.get("/{symbol}", response_model=DerivativesResponse)
 async def get_derivatives(symbol: str):
     """
-    Get options and Crank-Nicolson priced derivatives for a given symbol.
-    Cache-first and decoupled.
+    Get option-chain statistics (PCR, OI, volume, expiries) for a symbol from the analysis cache.
     """
     symbol_upper = symbol.strip().upper()
 
@@ -100,40 +99,12 @@ async def get_derivatives(symbol: str):
         except Exception as exc:
             logger.warning("[%s] Failed parsing raw options chain snapshot: %s", symbol_clean, exc)
 
-    # 2. Fetch Crank-Nicolson PDE priced options chain
-    priced_key = RedisKeys.MARKET_OPTIONS_PRICED.format(symbol=symbol_clean)
-    priced_cached = await redis.get(priced_key)
-
-    fair_priced_chain = []
-    priced_last_updated = ""
-
-    if priced_cached:
-        try:
-            priced_payload = json.loads(priced_cached)
-            priced_chain_raw = priced_payload.get("chain", [])
-            priced_last_updated = priced_payload.get("last_updated", "")
-            
-            for item in priced_chain_raw:
-                fair_priced_chain.append(PricedStrike(
-                    strike=float(item.get("strike", 0.0)),
-                    fair_call=float(item.get("fair_call", 0.0)),
-                    fair_put=float(item.get("fair_put", 0.0)),
-                    call_iv=float(item.get("call_iv", 0.0)),
-                    put_iv=float(item.get("put_iv", 0.0)),
-                    bs_fair_call=float(item["bs_fair_call"]) if item.get("bs_fair_call") is not None else None,
-                    bs_fair_put=float(item["bs_fair_put"]) if item.get("bs_fair_put") is not None else None,
-                    live_call=float(item["live_call"]) if item.get("live_call") is not None else None,
-                    live_put=float(item["live_put"]) if item.get("live_put") is not None else None
-                ))
-        except Exception as exc:
-            logger.warning("[%s] Failed parsing priced option chain snapshot: %s", symbol_clean, exc)
-
-    # Determine freshness and age
+    # Determine freshness and age. No theoretical (BSM/PDE) pricing is produced, so
+    # fair_priced_chain is always empty; the field is kept only for response compatibility.
     stale = True
-    effective_last_updated = priced_last_updated or last_updated
-    if effective_last_updated:
+    if last_updated:
         try:
-            dt = datetime.fromisoformat(effective_last_updated.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
             age_seconds = (datetime.now(timezone.utc) - dt).total_seconds()
             stale = age_seconds > 600  # 10 minutes
         except Exception:
@@ -148,14 +119,14 @@ async def get_derivatives(symbol: str):
         pe_oi=pe_oi,
         total_strikes=total_strikes,
         expiry_dates=expiry_dates,
-        fair_priced_chain=fair_priced_chain,
-        available=available and len(fair_priced_chain) > 0,
-        last_updated=effective_last_updated or _generated_at(),
+        fair_priced_chain=[],
+        available=available,
+        last_updated=last_updated,
         generated_at=_generated_at(),
         source="redis_read_model",
         stale=stale,
-        partial=not (available and len(fair_priced_chain) > 0),
-        status="COMPLETED" if (available and len(fair_priced_chain) > 0) else "CALCULATING"
+        partial=not available,
+        status="COMPLETED" if available else "CALCULATING"
     )
 
 
@@ -207,12 +178,16 @@ async def get_technicals(symbol: str, spot: Optional[float] = None):
         logger.warning("Failed fetching historical prices for %s technicals: %s", symbol_clean, hist_exc)
 
     technicals_data = compute_all_technicals(spot_price, price_history=price_history)
+    bar_count = len(price_history)
     technicals_data["symbol"] = symbol_clean
     technicals_data["generated_at"] = _generated_at()
-    technicals_data["source"] = "analytics_domain_engine"
-    technicals_data["stale"] = False
-    technicals_data["partial"] = False
-    technicals_data["status"] = "COMPLETED"
+    technicals_data["source"] = "yfinance_daily_closes"
+    technicals_data["bar_count"] = bar_count
+    # Honest flags: no history means the numbers are placeholders derived from spot only;
+    # fewer than 51 bars means SMA50/EMA50/MACD are not fully defined.
+    technicals_data["stale"] = bar_count == 0
+    technicals_data["partial"] = bar_count < 51
+    technicals_data["status"] = "FAILED" if bar_count == 0 else "COMPLETED"
 
     return technicals_data
 

@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 import pytest
 
 from domains.notifications.domain.entities import AlertRule, NotificationEvent
-from domains.notifications.domain.value_objects import ConditionType, DeliveryChannel, AlertStatus
+from domains.notifications.domain.value_objects import ConditionType, DeliveryChannel
 from domains.notifications.infrastructure.channels.websocket_channel import WebSocketNotificationChannelAdapter
 from domains.notifications.infrastructure.channels.webhook_channel import WebhookNotificationChannelAdapter
 

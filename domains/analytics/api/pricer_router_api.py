@@ -1,20 +1,16 @@
 """
-File Overview: FastAPI router for options pricer BSM calculations and live ticker data queries.
+File Overview: FastAPI router serving the analysis option-chain snapshot (NSE/yfinance) for the side panel.
+The /pricer prefix is kept for frontend compatibility; no theoretical (BSM/PDE) pricing is performed.
 
 All Functions/Classes:
-- pricer_router: APIRouter for pricer services.
-- get_ticker_parameters: GET endpoint fetching real-time Redis or dynamic live options parameters for a symbol.
-- calculate_bsm: POST endpoint executing BSM pricer and returning intermediate / final option edge parameters.
+- get_ticker_parameters: GET endpoint returning spot, nearest-expiry ATM parameters and the option chain.
 """
-import math
-import hashlib
 import json
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import numpy as np
-from scipy.stats import norm
 from fastapi import APIRouter, HTTPException
 
 from shared.utils.symbol_validator import SymbolValidator
@@ -22,8 +18,6 @@ from shared.infrastructure.redis_client import get_redis_client
 from shared.constants import RedisKeys
 from domains.analytics.api.schemas import (
     PricerTickerDataResponse,
-    BSMCalculateRequest,
-    BSMCalculateResponse,
     OptionChainRow,
     OptionChainSide,
 )
@@ -246,31 +240,17 @@ async def get_ticker_parameters(symbol: str):
                     except Exception:
                         expiry_days = 30
 
-                    ltp = float(nearest_strike_opt.get("last_price", 0.0))
                     raw_bid = nearest_strike_opt.get("bid")
                     raw_ask = nearest_strike_opt.get("ask")
                     bid = float(raw_bid) if raw_bid is not None and float(raw_bid) > 0 else None
                     ask = float(raw_ask) if raw_ask is not None and float(raw_ask) > 0 else None
                     
+                    # IV is reported only as published by the source; no model-implied IV is computed.
                     iv = float(nearest_strike_opt.get("iv", 0.0) or 0.0)
                     if iv > 0.0 and iv < 1.0:
                         iv *= 100.0
-                    elif iv <= 0.0 and ltp > 0 and spot > 0:
-                        # Attempt BSM IV solution
-                        try:
-                            from domains.analytics.domain.black_scholes import BSMCalculations
-                            solved_iv = BSMCalculations.implied_volatility(
-                                price=ltp,
-                                S=spot,
-                                K=float(nearest_strike_opt.get("strike", spot)),
-                                T=max(expiry_days, 1) / 365.0,
-                                r=rf_rate / 100.0,
-                                option_type="call"
-                            )
-                            if solved_iv and solved_iv > 0:
-                                iv = round(solved_iv * 100.0, 2)
-                        except Exception:
-                            iv = 0.0
+                    elif iv <= 0.0:
+                        iv = 0.0
 
                     # Parse option chains for ALL expiries from Redis
                     option_chains = {}
@@ -347,80 +327,8 @@ async def get_ticker_parameters(symbol: str):
         except Exception as exc:
             logger.warning("[%s] Failed fetching real-time pricer options params from Redis: %s", symbol_clean, exc)
 
-    # Real market data unavailable across all sources (Groww, yfinance, NSE)
+    # Real market data unavailable across all sources (yfinance, NSE)
     raise HTTPException(
         status_code=503,
         detail=f"Live market data is currently unavailable for '{symbol_clean}' across all market sources."
-    )
-
-
-@router.post("/calculate", response_model=BSMCalculateResponse)
-def calculate_bsm(request: BSMCalculateRequest):
-    """
-    Run high-precision Black-Scholes-Merton pricing logic on inputs.
-    """
-    S0 = request.S0
-    K = request.K
-    T_days = request.T_days
-    r = request.r
-    sigma = request.sigma
-    option_type = request.option_type.strip().lower()
-    q = request.q
-
-    if S0 <= 0 or K <= 0 or T_days < 0 or sigma <= 0:
-        raise HTTPException(
-            status_code=422,
-            detail="Stock price (S0), Strike (K), Expiry (T_days), and Volatility (sigma) must be greater than zero."
-        )
-
-    # Conversions
-    T_years = max(T_days, 0.001) / 365.0
-    r_frac = r / 100.0
-    sigma_frac = sigma / 100.0
-    q_frac = q / 100.0
-
-    # Intermediate d1, d2 formulas
-    try:
-        d1 = (math.log(S0 / K) + (r_frac - q_frac + 0.5 * sigma_frac ** 2) * T_years) / (sigma_frac * math.sqrt(T_years))
-        d2 = d1 - sigma_frac * math.sqrt(T_years)
-    except ZeroDivisionError:
-        raise HTTPException(status_code=422, detail="Volatility or Time to Expiry is too close to zero.")
-
-    # Cumulative normal probabilities
-    Nd1 = norm.cdf(d1)
-    Nd2 = norm.cdf(d2)
-
-    # Solvers
-    if option_type == "call":
-        fair_val = S0 * math.exp(-q_frac * T_years) * Nd1 - K * math.exp(-r_frac * T_years) * Nd2
-    elif option_type == "put":
-        fair_val = K * math.exp(-r_frac * T_years) * norm.cdf(-d2) - S0 * math.exp(-q_frac * T_years) * norm.cdf(-d1)
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="Option type must be 'call' or 'put'."
-        )
-
-    fair_val = max(fair_val, 0.0)
-
-    # Edge computation
-    edge = None
-    if request.market_mid is not None and request.market_mid > 0:
-        edge = fair_val - request.market_mid
-
-    return BSMCalculateResponse(
-        S0=S0,
-        K=K,
-        T_years=round(T_years, 4),
-        r=r,
-        sigma=sigma,
-        option_type=option_type,
-        q=q,
-        d1=round(d1, 4),
-        d2=round(d2, 4),
-        Nd1=round(Nd1, 4),
-        Nd2=round(Nd2, 4),
-        fair_value=round(fair_val, 2),
-        market_mid=request.market_mid,
-        edge=round(edge, 2) if edge is not None else None,
     )

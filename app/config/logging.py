@@ -5,6 +5,11 @@ def get_logging_config():
     return {
         "version": 1,
         "disable_existing_loggers": False,
+        "filters": {
+            "redact": {
+                "()": "shared.logging.redaction.RedactingFilter",
+            },
+        },
         "formatters": {
             "json": {
                 "()": "shared.logging.formatters.JSONFormatter",
@@ -18,7 +23,14 @@ def get_logging_config():
                 "class": "logging.StreamHandler",
                 "formatter": "json" if settings.AppEnv == "production" else "standard",
                 "level": settings.LogLevel,
+                "filters": ["redact"],
             },
+        },
+        "loggers": {
+            # httpx logs full request URLs at INFO; keep it at WARNING so query strings stay out of logs.
+            "httpx": {"level": "WARNING"},
+            "httpcore": {"level": "WARNING"},
+            "websockets": {"level": "WARNING"},
         },
         "root": {
             "handlers": ["console"],

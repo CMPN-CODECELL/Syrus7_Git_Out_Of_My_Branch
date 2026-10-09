@@ -23,9 +23,13 @@ if [ -z "$(ls -A /var/lib/postgresql/data)" ]; then
     su - postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/data -w start"
     
     # Create required DB and users from env vars
-    su - postgres -c "psql -c \"CREATE USER ${DB_USER:-postgres} WITH PASSWORD '${DB_PASSWORD:-postgres}';\"" || true
-    su - postgres -c "psql -c \"CREATE DATABASE \\\"NexusQuantDB\\\" OWNER ${DB_USER:-postgres};\"" || true
-    su - postgres -c "psql -c \"ALTER ROLE ${DB_USER:-postgres} SUPERUSER;\"" || true
+    # Least privilege: the app user owns its database but is not a superuser.
+    if [ -z "${DB_PASSWORD}" ]; then
+        echo "DB_PASSWORD must be set in .env" >&2
+        exit 1
+    fi
+    su - postgres -c "psql -c \"CREATE USER ${DB_USER:-kraken} WITH PASSWORD '${DB_PASSWORD}';\"" || true
+    su - postgres -c "psql -c \"CREATE DATABASE \\\"NexusQuantDB\\\" OWNER ${DB_USER:-kraken};\"" || true
     su - postgres -c "psql -d NexusQuantDB -c \"CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;\"" || true
 
     # Run versioned schema migrations

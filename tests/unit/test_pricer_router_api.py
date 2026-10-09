@@ -1,9 +1,8 @@
 """
 Unit tests for domains/analytics/api/pricer_router_api.py.
 
-Tests GET /v1/pricer/ticker/{symbol} and POST /v1/pricer/calculate
-covering Redis caching, dynamic market fetch fallback, fail-fast 503 handling,
-and BSM pricing computation logic.
+Tests GET /v1/pricer/ticker/{symbol} covering Redis caching, dynamic market fetch
+fallback and fail-fast 503 handling.
 """
 
 import json
@@ -118,71 +117,3 @@ class TestPricerTickerEndpoint:
         response = test_client.get("/v1/pricer/ticker/$$$INVALID!!!")
         assert response.status_code == 400
         assert "invalid or not supported" in response.json()["detail"]
-
-
-@pytest.mark.unit
-class TestPricerCalculateEndpoint:
-    """Unit tests for calculate_bsm endpoint."""
-
-    def test_calculate_call_option_success(self, test_client):
-        payload = {
-            "S0": 100.0,
-            "K": 100.0,
-            "T_days": 30,
-            "r": 5.0,
-            "sigma": 20.0,
-            "option_type": "call",
-            "q": 0.0,
-            "market_mid": 2.20
-        }
-        response = test_client.post("/v1/pricer/calculate", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["S0"] == 100.0
-        assert data["K"] == 100.0
-        assert data["option_type"] == "call"
-        assert data["fair_value"] > 0.0
-        assert data["d1"] is not None
-        assert data["d2"] is not None
-        assert data["edge"] is not None
-
-    def test_calculate_put_option_success(self, test_client):
-        payload = {
-            "S0": 100.0,
-            "K": 100.0,
-            "T_days": 30,
-            "r": 5.0,
-            "sigma": 20.0,
-            "option_type": "put",
-            "q": 0.0
-        }
-        response = test_client.post("/v1/pricer/calculate", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["option_type"] == "put"
-        assert data["fair_value"] > 0.0
-
-    def test_calculate_invalid_positive_inputs_returns_422(self, test_client):
-        payload = {
-            "S0": 0.0,
-            "K": 100.0,
-            "T_days": 30,
-            "r": 5.0,
-            "sigma": 20.0,
-            "option_type": "call"
-        }
-        response = test_client.post("/v1/pricer/calculate", json=payload)
-        assert response.status_code == 422
-
-    def test_calculate_invalid_option_type_returns_400(self, test_client):
-        payload = {
-            "S0": 100.0,
-            "K": 100.0,
-            "T_days": 30,
-            "r": 5.0,
-            "sigma": 20.0,
-            "option_type": "straddle"
-        }
-        response = test_client.post("/v1/pricer/calculate", json=payload)
-        assert response.status_code == 400
-        assert "Option type must be 'call' or 'put'" in response.json()["detail"]

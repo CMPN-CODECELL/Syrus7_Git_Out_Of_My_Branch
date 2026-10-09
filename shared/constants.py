@@ -41,7 +41,8 @@ class Streams:
     """Redis Stream names for durable/replayable cross-domain events."""
 
     PRICE_TRIGGER         = "stream:market.price_trigger"
-    OPTIONS_RAW_FETCHED   = "stream:options.raw_fetched"
+    # Legacy alert input. No producer since PDE pricing was removed; the
+    # notifications domain is rebuilt in Phase 3 (standing instructions).
     OPTIONS_PRICED        = "stream:options.priced"
     ANALYSIS_REFRESH_REQUESTED = "stream:analysis.refresh_requested"
 
@@ -77,7 +78,6 @@ class RedisKeys:
     # Ingestion domain owns:
     MARKET_PRICE       = "market:price:{symbol}"            # Today's OHLCV snapshot
     MARKET_OPTIONS     = "market:options:{symbol}"           # Latest option chain
-    MARKET_OPTIONS_PRICED = "market:options:priced:{symbol}" # Fair priced option chain
 
 
 # ── TTLs (seconds) ────────────────────────────────────────────
@@ -85,7 +85,6 @@ class RedisKeys:
 class TTL:
     MARKET_PRICE          = 60       # 60s — refreshed continuously every poll cycle
     MARKET_OPTIONS        = 120      # 2 min option chain freshness
-    MARKET_OPTIONS_PRICED = 120      # 2 min priced chain freshness
     HISTORICAL_OHLC       = 3600     # 1 hour for historical OHLC bars
 
 

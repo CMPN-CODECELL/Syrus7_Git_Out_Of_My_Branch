@@ -1,33 +1,18 @@
 """
-File Overview: Factory function to return the configured market price / option chain adapter.
+File Overview: Factory function to return the analysis market data adapter (yfinance + NSE scraper).
+Orders, P&L and price triggers never use this adapter; they use the 021 broker domain.
 """
 
 import logging
-from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 
 def get_market_data_adapter(redis_client=None):
     """
-    Returns the outbound adapter according to MARKET_DATA_PROVIDER configuration.
-    Accepts optional redis_client for adapters that support caching (e.g. dividend yield).
+    Returns the analysis-feed adapter. Only the NSE/yfinance adapter ships with Kraken.
+    redis_client is accepted for call-site compatibility.
     """
-    settings = get_settings()
-    provider = settings.MarketDataProvider.strip().lower()
-
-    if provider == "groww":
-        from domains.ingestion.infrastructure.outbound.groww_api_adapter import GrowwApiAdapter
-        logger.info("Initializing GrowwApiAdapter as the market data provider.")
-        return GrowwApiAdapter(
-            api_key=settings.GrowwApiKey,
-            secret_key=settings.GrowwApiSecret,
-            access_token=settings.GrowwAccessToken,
-            totp_secret=settings.GrowwTotpSecret,
-            pin=settings.GrowwPin,
-            redis_client=redis_client,
-        )
-    else:
-        from domains.ingestion.infrastructure.outbound.nse_api_adapter import NseApiAdapter
-        logger.info("Initializing NseApiAdapter (yfinance/NSE proxy) as the market data provider.")
-        return NseApiAdapter()
+    from domains.ingestion.infrastructure.outbound.nse_api_adapter import NseApiAdapter
+    logger.debug("Initializing NseApiAdapter (yfinance/NSE) as the analysis data provider.")
+    return NseApiAdapter()

@@ -7,6 +7,8 @@ Background loops (all tolerant of 021 / Redis / Postgres being down):
 - market socket: connect, resubscribe, reconnect forever.
 - watchlist: every 60 s read holdings + positions, keep their prices subscribed (pinned), and
   publish the analysis watchlist to Redis for the Celery backfill.
+- orders (Level 2, needs the Postgres order tables): boot recovery of unresolved sends, the
+  reconciler loop, and the orders socket with REST catch-up.
 """
 import asyncio
 import logging
@@ -23,13 +25,22 @@ from domains.broker.infrastructure.instruments import (
 )
 from domains.broker.infrastructure.rest_client import TradeRestClient
 from domains.copilot.application.chat_service import ConversationStore, CopilotChatService
+from domains.copilot.application.draft_tools import DraftToolbox
+from domains.copilot.application.order_builder import OrderBuilder
 from domains.copilot.application.read_tools import MarketServices, ReadToolbox
 from domains.copilot.infrastructure.gemini_adapter import GeminiLLM
 from domains.historical.application.candle_service import CandleService
 from domains.marketdata.domain.price_cache import PriceCache
 from domains.marketdata.domain.symbol_map import analysis_key, yfinance_ticker
 from domains.marketdata.infrastructure.market_socket import MarketSocketClient
+from domains.marketdata.infrastructure.orders_socket import OrdersSocketClient
+from domains.orders.application.execution import ExecutionService
+from domains.orders.application.hub import UserHub
+from domains.orders.application.proposals import ProposalService
+from domains.orders.application.reconciler import Reconciler
+from domains.orders.application.tracker import OrderTracker
 from shared.contracts.instruments import EXCHANGE_TO_WS_CODE
+from shared.logging.logger import get_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +56,17 @@ async def _ohlc_repo():
 
 
 class KrakenRuntime:
-    def __init__(self, settings: Settings, *, llm=None, transport=None):
+    def __init__(self, settings: Settings, *, llm=None, transport=None, order_store=None, audit_sink=None):
         self.settings = settings
+        self.store = order_store
+        self.audit = audit_sink
+        self.hub = UserHub()
+        self.execution: Optional[ExecutionService] = None
+        self.proposals: Optional[ProposalService] = None
+        self.reconciler: Optional[Reconciler] = None
+        self.tracker: Optional[OrderTracker] = None
+        self.orders_socket: Optional[OrdersSocketClient] = None
+        self.orders_error: Optional[str] = None
         self.broker = TradeRestClient(
             settings.TradeApiBaseUrl,
             settings.TradeApiUsername,
@@ -55,6 +75,7 @@ class KrakenRuntime:
             rate_per_second=settings.TradeApiRatePerSecond,
             max_get_retries=settings.TradeApiMaxGetRetries,
             transport=transport,
+            audit=self._audit_http,
         )
         self.instruments = InstrumentStore()
         self.instrument_repo = InstrumentRepository(settings.InstrumentsCachePath)
@@ -79,12 +100,19 @@ class KrakenRuntime:
     # ── lifecycle ──
     async def start(self) -> None:
         self._load_instruments_from_disk()
+        await self.init_orders()
         if not self.broker.configured:
             logger.warning("021 credentials not configured; broker features disabled")
             return
         self._tasks.append(asyncio.create_task(self._instrument_loop(), name="kraken-instruments"))
         self.socket.start()
         self._tasks.append(asyncio.create_task(self._watchlist_loop(), name="kraken-watchlist"))
+        if self.execution is not None:
+            recovered = await self.reconciler.recover_on_boot()
+            if recovered:
+                logger.warning("Recovered %d order(s) left mid-send by a restart; reconciling before anything else", recovered)
+            self.reconciler.start()
+            self.orders_socket.start()
 
     async def stop(self) -> None:
         for task in self._tasks:
@@ -94,8 +122,53 @@ class KrakenRuntime:
                 await task
             except (asyncio.CancelledError, Exception):
                 pass
+        if self.reconciler is not None:
+            await self.reconciler.stop()
+        if self.orders_socket is not None:
+            await self.orders_socket.stop()
         await self.socket.stop()
         await self.broker.aclose()
+
+    # ── orders (Level 2) ──
+    async def init_orders(self) -> bool:
+        """Wire proposals, execution, reconciler and tracking. Needs a durable order store: without
+        the Postgres tables, order features stay off rather than fall back to memory (a restart
+        would lose unresolved sends)."""
+        if self.store is None:
+            try:
+                from domains.orders.infrastructure.pg_store import PgAuditSink, PgOrderStore
+                from shared.infrastructure.database import get_database_pool
+
+                pool = await asyncio.wait_for(get_database_pool(), timeout=8)
+                if await pool.fetchval("SELECT to_regclass('kraken_order_journal')") is None:
+                    raise RuntimeError("order tables missing; run scripts/migrate.py")
+                self.store, self.audit = PgOrderStore(pool), PgAuditSink(pool)
+            except Exception as exc:
+                self.orders_error = f"order store unavailable: {exc}"[:200]
+                logger.error("Order features disabled: %s", self.orders_error)
+                return False
+        builder = OrderBuilder(self.toolbox)
+        self.proposals = ProposalService(self.store, self.audit)
+        drafts = DraftToolbox(builder, self.proposals)
+        self.reconciler = Reconciler(self.store, self.broker, self.audit, self.hub)
+        self.tracker = OrderTracker(self.store, self.broker, self.audit, self.hub, ucc=self.settings.TradeApiUsername)
+        self.reconciler.on_not_placed = self.tracker.remember_not_placed
+        self.execution = ExecutionService(
+            self.store, self.broker, self.audit, self.hub,
+            pre_send_check=builder.pre_send_check, requote=drafts.requote, on_unknown=self.reconciler.kick,
+        )
+        self.orders_socket = OrdersSocketClient(
+            self.settings.TradeWsBaseUrl, self.broker.get_ephemeral_key, self.tracker.on_packet, self.tracker.catch_up,
+        )
+        self.chat.enable_orders(drafts)
+        self.orders_error = None
+        return True
+
+    async def _audit_http(self, event: dict) -> None:
+        # Every order action and every failed 021 call goes to the audit trail (successful reads are noise).
+        if self.audit is None or (not event.get("order_action") and event.get("outcome") == "ok" and (event.get("status") or 0) < 400):
+            return
+        await self.audit.record("broker_http", request_id=get_correlation_id(), data=event)
 
     # ── instruments ──
     def _load_instruments_from_disk(self) -> None:
@@ -200,5 +273,9 @@ class KrakenRuntime:
             "watchlist_symbols": len(self._watchlist),
             "last_watchlist_sync": self.last_watchlist_sync.isoformat() if self.last_watchlist_sync else None,
             "llm_configured": bool(self.settings.GeminiApiKey),
+            "orders_enabled": self.execution is not None,
+            "orders_error": self.orders_error,
+            "orders_socket_connected": bool(self.orders_socket and self.orders_socket.connected),
+            "trading_kill_switch": self.settings.TradingKillSwitch,
             "last_error": self.last_error or self.socket.last_error,
         }

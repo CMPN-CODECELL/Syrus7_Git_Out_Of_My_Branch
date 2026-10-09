@@ -1,11 +1,16 @@
 """
-Read-only tool catalogue for the LLM. Each tool has a strict argument model (unknown keys are
-rejected) and a JSON-schema declaration for function calling. There is deliberately no tool
-that can create, send, modify or cancel an order.
+Tool catalogue for the LLM. Each tool has a strict argument model (unknown keys are rejected)
+and a JSON-schema declaration for function calling.
+
+Read tools return facts. Draft tools (Level 2) only create a proposal card for the trader to
+approve or reject. There is deliberately no tool that sends, approves, modifies or cancels an
+order at the broker.
 """
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from shared.contracts.orders import OrderChangeDraft, OrderDraft
 
 
 class _Args(BaseModel):
@@ -98,5 +103,66 @@ TOOL_DECLARATIONS: list[dict] = [
             "op": {"type": "STRING", "enum": ["below", "above"]},
             "value": {"type": "NUMBER"},
         }),
+    },
+]
+
+
+# ── Draft tools (Level 2): create a proposal card; never send ──
+
+DRAFT_TOOL_ARG_MODELS: dict[str, type[BaseModel]] = {
+    "draft_order": OrderDraft,
+    "draft_modify_order": OrderChangeDraft,
+    "draft_cancel_order": OrderChangeDraft,
+}
+
+_PRICE_TEXT = "Exactly as the trader wrote it, e.g. '2800', '₹2,800.50', '2.8k'. Do not convert units."
+
+_CHANGE_PROPS = {
+    "symbol_query": {"type": "STRING", "description": "Symbol or name of the order's instrument, e.g. HDFCBANK"},
+    "side": {"type": "STRING", "enum": ["BUY", "SELL"], "description": "Only if the trader said which side"},
+    "stop_loss_only": {"type": "BOOLEAN", "description": "True when the trader refers to their stop-loss order"},
+    "order_id": {"type": "STRING", "description": "Only if the trader gave or picked an order number"},
+}
+
+DRAFT_TOOL_DECLARATIONS: list[dict] = [
+    {
+        "name": "draft_order",
+        "description": ("Prepare a NEW order as a confirmation card for the trader to approve. Does not send anything. "
+                        "Use only for explicit instructions to buy or sell, never for hypotheticals. Leave quantity empty "
+                        "if the trader did not give one; Kraken will ask."),
+        "parameters": _obj({
+            "action": {"type": "STRING", "enum": ["BUY", "SELL"]},
+            "symbol_query": {"type": "STRING", "description": "Symbol or company name; for F&O the underlying, e.g. NIFTY"},
+            "quantity": {"type": "INTEGER", "description": "Shares, or lots when quantity_mode is LOTS. Omit if not stated."},
+            "quantity_mode": {"type": "STRING", "enum": ["UNITS", "LOTS", "HALF", "ALL"],
+                              "description": "HALF/ALL = half/all of the current holding or position"},
+            "order_type": {"type": "STRING", "enum": ["MARKET", "LIMIT", "SL"]},
+            "limit_price": {"type": "STRING", "description": _PRICE_TEXT},
+            "trigger_price": {"type": "STRING", "description": "Stop-loss trigger. " + _PRICE_TEXT},
+            "product": {"type": "STRING", "enum": ["CNC", "INTRADAY", "NRML"], "description": "Only if the trader said so"},
+            "exchange_hint": {"type": "STRING", "enum": ["NSE", "BSE"], "description": "Only if the trader named BSE/NSE"},
+            "validity": {"type": "STRING", "enum": ["Day", "IOC"]},
+            "instrument_kind": {"type": "STRING", "enum": ["EQUITY", "OPTION", "FUTURE"]},
+            "expiry": {"type": "STRING", "description": "Trader's words, e.g. 'this expiry', 'next', '28 Oct'"},
+            "strike": {"type": "STRING", "description": "Option strike as written, e.g. '24500'"},
+            "option_type": {"type": "STRING", "enum": ["CE", "PE"]},
+            "source": {"type": "STRING", "enum": ["HOLDING", "POSITION"], "description": "Only to answer which one to sell from"},
+            "short": {"type": "BOOLEAN", "description": "True only if the trader explicitly asked to short-sell"},
+        }, ["action", "symbol_query"]),
+    },
+    {
+        "name": "draft_modify_order",
+        "description": "Prepare a change to one OPEN order (price, stop-loss trigger or quantity) as a confirmation card. Does not send anything.",
+        "parameters": _obj({
+            **_CHANGE_PROPS,
+            "new_limit_price": {"type": "STRING", "description": _PRICE_TEXT},
+            "new_trigger_price": {"type": "STRING", "description": _PRICE_TEXT},
+            "new_quantity": {"type": "INTEGER"},
+        }, ["symbol_query"]),
+    },
+    {
+        "name": "draft_cancel_order",
+        "description": "Prepare cancellation of one OPEN order as a confirmation card. Does not send anything.",
+        "parameters": _obj(dict(_CHANGE_PROPS), ["symbol_query"]),
     },
 ]

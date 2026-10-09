@@ -129,6 +129,12 @@ class InstrumentStore:
             if i.exchange == exchange and i.option_type is not None
         ]
 
+    def futures(self, underlying_symbol: str, *, exchange: str = "NSEFO") -> list[Instrument]:
+        return [
+            i for i in self._by_symbol.get(underlying_symbol.upper(), [])
+            if i.exchange == exchange and i.option_type is None and i.instrument_type.startswith("FUT")
+        ]
+
     def option_expiries(self, underlying_symbol: str, *, exchange: str = "NSEFO") -> list[int]:
         return sorted({i.expiry for i in self.options(underlying_symbol, exchange=exchange) if i.expiry})
 

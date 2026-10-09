@@ -6,7 +6,7 @@ Each control is marked **built** (exists in the code, with a test or config file
 
 | Asset | Threat | Main controls |
 |---|---|---|
-| The trader's 021 account | A trade the trader did not clearly approve | LLM has no send tool (built); hash-bound, single-use, expiring approval (planned, L2) |
+| The trader's 021 account | A trade the trader did not clearly approve; a duplicate order | LLM has no send tool; hash-bound, single-use, owner-only, expiring approval; never resend an unknown outcome (all built) |
 | 021 credentials and access token | Leak through logs, the browser, the LLM or git | Server-only settings, log redaction, gitleaks (built) |
 | Gemini API key | Leak, cost abuse | Server-only; per-user chat rate limit and length cap (built) |
 | User sessions | Forged identity | Supabase JWT verified server-side (built) |
@@ -16,15 +16,19 @@ Each control is marked **built** (exists in the code, with a test or config file
 
 | Control | Status | Where |
 |---|---|---|
-| The LLM's tools are read-only; no tool can place, modify or cancel | built | [tool_specs.py](../domains/copilot/domain/tool_specs.py); `test_no_tool_can_touch_orders` |
-| Unknown tools and extra or invalid arguments are refused before anything runs | built | [chat_service.py](../domains/copilot/application/chat_service.py); `test_unknown_tool_is_refused`, `test_invalid_and_extra_arguments_are_refused` |
+| No LLM tool can send, approve, modify or cancel at the broker; draft tools only create proposal cards | built | [tool_specs.py](../domains/copilot/domain/tool_specs.py); `test_no_tool_can_touch_orders`, `test_chat_drafts.py::test_draft_tool_creates_card_and_never_sends` |
+| The only send path is `POST /v1/proposals/{id}/approve` → `ExecutionService.approve()` | built | [execution.py](../domains/orders/application/execution.py), [orders router](../domains/orders/api/router.py) |
+| Unknown tools and extra or invalid arguments are refused before anything runs (including `"approve": true` smuggled into a draft) | built | `test_unknown_tool_is_refused`, `test_injected_send_instruction_in_args_is_rejected` |
 | A reply claiming an order was placed, sent, cancelled or approved is replaced | built | `test_replies_claiming_an_order_action_are_replaced` |
-| Typing "yes" or "confirm" in chat does nothing | built (no approval path exists) | `test_typing_confirm_does_nothing_special` |
+| Typing "yes" or "confirm" in chat approves nothing; only the Approve call does | built | `test_typing_confirm_does_nothing_special`; prompt in [prompts.py](../domains/copilot/application/prompts.py) |
+| The LLM never converts money: price/expiry text is parsed by code; no default quantity | built | [parsing.py](../domains/copilot/domain/parsing.py), [order_builder.py](../domains/copilot/application/order_builder.py); `test_parsing.py`, `test_missing_quantity_is_asked_never_defaulted` |
 | Order payloads are strict models: non-zero qty, SL needs a trigger, CNC is cash-only, NRML is F&O-only, no extra keys | built | [orders.py](../shared/contracts/orders.py); `test_contracts.py` |
-| Proposals and plans are bound to the SHA-256 of their canonical payload | built (contracts only) | `test_proposal_rejects_hash_mismatch`, `test_plan_hash_covers_every_leg` |
-| Approval endpoint: compare-and-set PROPOSED → APPROVED, hash match, 60 s TTL, 0.5% drift re-quote | planned (L2) | — |
-| Server-side limits (max value, max qty, allowed exchanges/products) and kill switch | planned (L2): settings exist, enforcement does not | [settings.py](../app/config/settings.py) |
-| Order actions never retried; lost responses reconciled, never resent | built (client); reconciler planned | `test_order_post_timeout_after_accept_is_outcome_unknown_and_not_resent` |
+| Proposals are immutable rows bound to the SHA-256 of their canonical payload; the card renders from the row; approve must echo the hash | built | `test_hash_mismatch_refused`, `test_card_then_approve_sends_once` |
+| Approval: owner-only, single-use compare-and-set PROPOSED → APPROVED together with the journal insert (one transaction), 60 s expiry | built | `test_concurrent_double_click_sends_once`, `test_other_user_cannot_approve`, `test_expired_card_refused`; Postgres: `tests/integration/test_order_store_pg.py` |
+| Re-checks right before sending: price drift ≤ 0.5% (else a fresh card), source quantity unchanged, target order still open, instruments from today | built | `test_price_drift_over_half_percent_requotes_without_sending`, `test_source_quantity_changed_aborts_sell_half`, `test_order_filled_before_cancel_approval_is_refused`, `test_stale_instruments_block_approval` |
+| Server-side limits (max value, max qty, allowed exchanges/products) and kill switch, at draft **and** approval time | built | `test_limits_and_kill_switch`, `test_kill_switch_blocks_approval` |
+| Order actions never retried; unknown outcomes reconciled from `GET /orders`, never resent; AMBIGUOUS never auto-resolved | built | `test_l2_exit.py`, `test_reconciler_tracker.py` |
+| Sends are serialised (one at a time), so Kraken's own identical orders never race | built | [execution.py](../domains/orders/application/execution.py) (`_send_lock`) |
 
 ## 3. Prompt injection
 
@@ -68,7 +72,10 @@ If a secret leaks: rotate it at the source (021 web app password, Google AI Stud
 | Error responses carry a request ID, never a stack trace | built (not yet tested) | [app/main.py](../app/main.py) |
 | Internal ingestion key compared in constant time | built | [shared/middleware/auth.py](../shared/middleware/auth.py) |
 | UI renders with `textContent`, plus a strict CSP | planned (UI team) | [API.md](API.md) rendering rules |
-| CSRF token on state-changing routes (especially approve) | planned (L2) | — |
+| Proposal/order/stream routes require a verified login; users only see their own proposals and orders | built | [orders router](../domains/orders/api/router.py); `test_other_users_cannot_see_or_approve` |
+| No CSRF token **by design**: Bearer-header auth (never cookies), approve/reject JSON-only and Origin-allowlisted, hash echo (ADR-011) | built | `test_approve_requires_login_json_and_allowed_origin` |
+| Order stream: Origin checked on the WebSocket handshake; JWT required in the first message (no token in the URL) | built | `test_stream_requires_auth_and_pushes_updates` |
+| Approve rate limit (30/min per user) | built | [orders router](../domains/orders/api/router.py) |
 | Each Supabase user mapped to exactly one 021 account | planned; today one server-side 021 account serves the deployment | — |
 | Legacy alert rules: owner column, webhook allowlist (SSRF) | planned (L3 rebuild); today the routes require a verified login | — |
 
@@ -81,11 +88,16 @@ If a secret leaks: rotate it at the source (021 web app password, Google AI Stud
 | App DB role is not a superuser; prod compose refuses to start without passwords | built | [start.sh](../docker/start.sh), [docker-compose.prod.yml](../docker-compose.prod.yml) |
 | pip-audit in CI | built, reports only (not blocking yet) | [ci.yml](../.github/workflows/ci.yml) |
 | Pinned dependency versions | planned | `requirements.txt` uses lower bounds |
-| Append-only audit table (proposal, approval, request, response, socket event) | planned (L2); the REST client already has an audit hook | [rest_client.py](../domains/broker/infrastructure/rest_client.py) |
+| Append-only audit table (proposal created/rejected/expired, approval attempt, send, result, reconciliation, socket events, every order action and failed 021 call), linked by request, proposal, journal and order IDs | built: a trigger blocks UPDATE/DELETE; audit failures never block trading | [migration_kraken_002_orders.sql](../scripts/migration_kraken_002_orders.sql), [pg_store.py](../domains/orders/infrastructure/pg_store.py); `tests/integration/test_order_store_pg.py::test_audit_is_append_only` (needs Postgres) |
+| Order features refuse to run without the durable store (no in-memory fallback in production) | built | [app/runtime.py](../app/runtime.py) `init_orders` (ADR-012) |
+| Audit-log viewer in the UI | planned | — |
 
 ## 7. Viva answers
 
-- **"How could the model place a trade I didn't approve?"** It can't. Its only tools are the seven read tools in `tool_specs.py`, and arguments are validated before anything runs. No route in the app sends an order today. From Level 2, sending requires `POST /proposals/{id}/approve` from an authenticated click, bound to the payload hash, used once and before expiry.
-- **"What if a stock name contains instructions?"** It reaches the model as fenced `untrusted_data`, reduced to a safe 24-character symbol, and the model has no write tool to act on it anyway.
-- **"What if the POST times out?"** `BrokerOutcomeUnknownError`, exactly one POST, no resend. It gets reconciled against `GET /orders` (ADR-003).
+- **"How could the model place a trade I didn't approve?"** It can't. Its tools are seven read tools plus three draft tools that only save a proposal row; all arguments are validated first. The single send path is `POST /v1/proposals/{id}/approve`. That requires your verified login and your own proposal, the hash of the card you saw, an unexpired card, and an atomic PROPOSED → APPROVED that only one request can ever win.
+- **"What if I double-click Approve, or approve from two tabs?"** The compare-and-set and the journal insert happen in one transaction, and `UNIQUE(proposal_id)` backs it up: one send at most (`test_concurrent_double_click_sends_once`).
+- **"What if the price moves while I decide?"** Over 0.5% (or after 60 s), nothing is sent and you get a fresh card.
+- **"What if a stock name contains instructions?"** It reaches the model as fenced `untrusted_data`, reduced to a safe 24-character symbol, and the model has no tool that sends anything.
+- **"What if the POST times out?"** Journal state UNKNOWN, exactly one POST, no resend. The reconciler matches `GET /orders`: ACKED, NOT_PLACED, or AMBIGUOUS for you to check (ADR-003, ADR-013). Proven over 200 faulty runs in `test_l2_exit.py`.
+- **"Why no CSRF token?"** Auth is a Bearer header that browsers never send by themselves. Approve is also JSON-only and Origin-checked (ADR-011).
 - **"Where is my 021 password?"** Only in the server's `.env` and inside `TokenManager`. It's redacted from logs and never sent to the browser or the LLM.

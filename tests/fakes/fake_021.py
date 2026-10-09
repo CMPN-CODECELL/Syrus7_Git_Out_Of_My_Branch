@@ -7,11 +7,14 @@ Use it to prove behaviour under the sandbox's deliberate failures:
     fake.fail_next("/orders", method="POST", exc=httpx.ReadTimeout, accept_first=True)  # timeout AFTER the order was booked
     fake.random_fault_rate = 0.3                                       # 30% of calls get 500/503/429
     fake.revoke_token()                                                # simulate another login elsewhere
+    fake.order_fault_rate = 0.4                                        # 40% of order POSTs hit a random send fault
+    fake.fill(order_id, qty, price)                                    # simulate an exchange fill
 """
 import gzip
 import itertools
 import json
 import random
+import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Optional
@@ -53,6 +56,11 @@ class Fake021:
         self.random_statuses = (500, 503, 429)
         self.rng = random.Random(seed)
         self.requests: list[tuple[str, str]] = []
+        self.order_bodies: list[dict] = []        # every POST /orders body 021 actually booked
+        self.order_fault_rate = 0.0
+        # timeout after booking / timeout before booking / 503 without booking / risk rejection
+        self.order_fault_modes = ("timeout_after_accept", "timeout_before_accept", "gateway_503", "risk_reject")
+        self.fault_log: list[str] = []
 
     # ── wiring ──
     def transport(self) -> httpx.MockTransport:
@@ -100,16 +108,29 @@ class Fake021:
 
     def _book_order(self, body: dict) -> dict:
         order_id = next(self._order_seq)
+        now = int(time.time())
         order = {
-            "orderId": order_id, "time": 1791451200, "lastActivity": 1791451200,
-            "token": body.get("token"), "exchange": {"NSE": "NSECM", "BSE": "BSEEQ"}.get(body.get("exchange"), body.get("exchange")),
+            "orderId": order_id, "time": now, "lastActivity": now,
+            "token": body.get("token"), "exchange": {"NSE": "NSECM", "BSE": "BSEEQ", "BSEFO": "BSEEQD"}.get(body.get("exchange"), body.get("exchange")),
             "product": body.get("product"), "qtyRemaining": body.get("qty"), "qtyTraded": 0, "discQty": 0,
             "price": body.get("price"), "triggerPrice": body.get("trigger", 0), "book": body.get("book"),
-            "validity": body.get("validity"), "status": "Pending", "reason": "", "placedBy": "User",
-            "amo": bool(body.get("amo")), "exchangeOrderNumber": "",
+            "validity": body.get("validity"), "status": "AcceptedForAMO" if body.get("amo") else "Pending", "reason": "",
+            "placedBy": "User", "amo": bool(body.get("amo")), "exchangeOrderNumber": "",
         }
         self.orders.insert(0, order)
+        self.order_bodies.append(dict(body))
         return order
+
+    def fill(self, order_id, qty: int, price: int) -> None:
+        """Simulate an exchange fill of `qty` (absolute) at `price` paise."""
+        order = next(o for o in self.orders if str(o["orderId"]) == str(order_id))
+        sign = 1 if order["qtyRemaining"] > 0 else -1
+        order["qtyTraded"] += qty
+        order["qtyRemaining"] -= sign * qty
+        order["status"] = "Executed" if order["qtyRemaining"] == 0 else "Pending"
+        self.trades.append({"tradeId": len(self.trades) + 1, "orderId": order["orderId"], "tradeTime": int(time.time()),
+                            "quantity": sign * qty, "token": order["token"], "exchange": order["exchange"],
+                            "product": order["product"], "price": price})
 
     # ── request handling ──
     async def _handle(self, request: httpx.Request) -> httpx.Response:
@@ -169,6 +190,17 @@ class Fake021:
                 return self._json(200, rows)
 
         if path == "/orders" and method == "POST":
+            if self.order_fault_rate and self.rng.random() < self.order_fault_rate:
+                mode = self.rng.choice(self.order_fault_modes)
+                self.fault_log.append(mode)
+                if mode == "timeout_after_accept":
+                    self._book_order(body)
+                    raise httpx.ReadTimeout("injected: booked, response lost", request=request)
+                if mode == "timeout_before_accept":
+                    raise httpx.ReadTimeout("injected: request lost", request=request)
+                if mode == "gateway_503":
+                    return self._json(503, self._envelope(None, success=False, error="Service temporarily unavailable"))
+                return self._json(500, self._envelope(None, success=False, error="Insufficient funds"))
             order = self._book_order(body)
             return self._json(200, self._envelope({"type": "SUCCESS", "message": "Order placed successfully", "orderId": str(order["orderId"])}))
         if path.startswith("/orders/") and method in ("PUT", "DELETE"):
@@ -176,7 +208,13 @@ class Fake021:
             rows = [o for o in self.orders if str(o["orderId"]) == oid]
             if not rows:
                 return self._json(400, self._envelope(None, success=False, error="Invalid order id"))
-            rows[0]["status"] = "SentForCancellation" if method == "DELETE" else "SentForModification"
+            order = rows[0]
+            if order["status"] not in ("Pending", "Placed", "Received", "AcceptedForAMO"):
+                return self._json(500, self._envelope(None, success=False, error=f"Order is {order['status']}"))
+            if method == "DELETE":
+                order["status"] = "Cancelled"
+            else:
+                order.update({"price": body.get("price"), "triggerPrice": body.get("trigger", 0), "qtyRemaining": body.get("qty")})
             return self._json(200, self._envelope({"type": "SUCCESS", "message": "ok"}))
 
         return self._json(400, self._envelope(None, success=False, error=f"unknown route {method} {path}"))

@@ -29,7 +29,9 @@ Copy `.env.example` to `.env`. Write each line as `KEY=value`, with no spaces ar
 | `GEMINI_MODEL` | no | Default `gemini-2.5-flash` |
 | `CHAT_MAX_MESSAGE_CHARS`, `CHAT_RATE_LIMIT_PER_MINUTE`, `CHAT_MAX_TOOL_CALLS` | no | Chat guards (1000 / 20 / 6) |
 | `BACKFILL_DAYS` | no | Days of daily history to keep and backfill (default 400) |
-| `TRADING_KILL_SWITCH`, `MAX_ORDER_VALUE_PAISE`, `MAX_ORDER_QTY`, `ALLOWED_EXCHANGES`, `ALLOWED_PRODUCTS` | no | Order limits for Level 2. Defined, **not enforced yet** |
+| `TRADING_KILL_SWITCH` | no | `true` blocks all new cards and all approvals immediately after restart (default `false`) |
+| `MAX_ORDER_VALUE_PAISE`, `MAX_ORDER_QTY` | no | Per-order safety limits, checked when the card is built **and** at approval (defaults ₹2,00,000 and 5,000) |
+| `ALLOWED_EXCHANGES`, `ALLOWED_PRODUCTS` | no | Exchanges/products Kraken may trade (defaults `NSE,NSEFO` and `CNC,INTRADAY,NRML`) |
 | `WATCHLIST_SYMBOLS`, `PRICE_POLL_INTERVAL_SECONDS`, `OPTIONS_POLL_INTERVAL_SECONDS` | no | Inherited analysis polling |
 
 ## Start
@@ -40,10 +42,16 @@ docker compose up -d --build
 
 The app listens on http://127.0.0.1:8000. Postgres and Redis run inside the container and are not reachable from the host. Use `docker compose exec app ...` for psql or redis-cli.
 
-On an existing database volume, apply new migrations after pulling:
+On an existing database volume, apply new migrations after pulling. **Order features stay off until migration `kraken_002` has run** (`orders_enabled: false`):
 
 ```bash
 docker compose exec app python scripts/migrate.py
+```
+
+Then restart the app so it picks up the new tables:
+
+```bash
+docker compose restart app
 ```
 
 To view logs:
@@ -66,6 +74,22 @@ docker compose logs -f app
 | `silent_subscriptions` | `0` | 021 ignored a subscription (unknown token or wrong exchange code) |
 | `watchlist_symbols` | number of holdings + open positions | `0` with a non-empty portfolio means watchlist sync is failing |
 | `llm_configured` | `true` | Set `GEMINI_API_KEY` |
+| `orders_enabled` | `true` | See `orders_error`: usually the migration hasn't run or the DB is down |
+| `orders_socket_connected` | `true` | Order status still updates via the REST catch-up on reconnect; check `last_error` |
+| `trading_kill_switch` | `false` | `true` means all sending is paused on purpose |
+
+## Emergency stop
+
+Set `TRADING_KILL_SWITCH=true` in `.env` and run `docker compose up -d`. New cards and approvals are refused at once. Orders already at 021 are not touched; cancel them in the 021 app or ask Kraken to "cancel my … order" after turning the switch off.
+
+## Inspecting orders and the audit trail
+
+```bash
+docker compose exec app psql "$DATABASE_URL" -c "SELECT state, order_id, order_status, reason, sent_at FROM kraken_order_journal ORDER BY sent_at DESC LIMIT 20;"
+docker compose exec app psql "$DATABASE_URL" -c "SELECT at, kind, proposal_id, order_id, data FROM kraken_audit_log ORDER BY id DESC LIMIT 50;"
+```
+
+The audit log is append-only: UPDATE and DELETE raise an error by design.
 
 ## Read-only check against the real sandbox
 
@@ -91,6 +115,14 @@ It logs in, counts positions, holdings and orders, downloads and decodes instrum
 | Chat replies "The language model is unavailable right now." | Gemini key missing or invalid, quota exhausted, or network | Check `GEMINI_API_KEY` and the Google AI Studio quota |
 | 401 on `/v1/chat` | Missing or expired Supabase token, wrong `SUPABASE_JWT_SECRET`, or audience mismatch | Log in again; check the secret/JWKS and `SUPABASE_JWT_AUDIENCE` |
 | Redis `NOAUTH` / container restarts | `REDIS_PASSWORD` missing, or `REDIS_URL` without the password | Set both (see the table above) |
+| Chat says order placement is not enabled | `orders_enabled: false` | Run the migration and restart (see "Start") |
+| Approve returns 403 | The UI's origin isn't in `ALLOWED_ORIGINS` | Add the exact origin (scheme://host:port) |
+| Approve returns 415 | The request wasn't `Content-Type: application/json` | Send JSON |
+| Approve returns 409 `requote` | The price moved more than 0.5% since the card was shown | Use `new_proposal` from the response |
+| Journal row `UNKNOWN` | 021 didn't confirm the send | Wait: the reconciler resolves it within ~20 s. It is never resent |
+| Journal row `AMBIGUOUS` | Several identical 021 orders could match the send (e.g. one placed manually in the 021 app) | Check the order book in the 021 app; Kraken won't resolve or resend it |
+| Journal row `NOT_PLACED` but the order later shows in 021 | 021 booked it very late | The tracker links it when its event arrives and the trader is told (`order_late_link` in the audit log) |
+| Orders refused: "instrument list is out of date" | Today's instruments file hasn't been downloaded | Check `instruments_fresh` and `last_error` |
 
 ## Rotating credentials
 

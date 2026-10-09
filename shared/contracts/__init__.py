@@ -13,6 +13,9 @@ from shared.contracts.instruments import (
     Instrument,
 )
 from shared.contracts.orders import (
+    FINAL_ORDER_STATUSES,
+    JournalEntry,
+    OrderChangeDraft,
     OrderDraft,
     OrderEvent,
     OrderPayload,
@@ -28,6 +31,9 @@ __all__ = [
     "EXCHANGE_TO_WS_CODE",
     "WS_CODE_TO_EXCHANGE",
     "Instrument",
+    "FINAL_ORDER_STATUSES",
+    "JournalEntry",
+    "OrderChangeDraft",
     "OrderDraft",
     "OrderEvent",
     "OrderPayload",

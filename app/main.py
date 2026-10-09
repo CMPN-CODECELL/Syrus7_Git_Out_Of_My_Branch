@@ -32,6 +32,7 @@ from domains.analytics.api.pricer_router_api import router as pricer_router
 from domains.ingestion.api.nse_options_router_api import nse_options_router_api
 from domains.notifications.api.router import router as notifications_router
 from domains.copilot.api.router import router as copilot_router
+from domains.orders.api.router import router as orders_router
 from app.config.settings import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +134,7 @@ app.include_router(pricer_router, prefix="/v1")
 app.include_router(nse_options_router_api, prefix="/v1/ingestion")
 app.include_router(notifications_router)
 app.include_router(copilot_router)
+app.include_router(orders_router)
 
 
 @app.get("/health")

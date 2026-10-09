@@ -1,7 +1,9 @@
 """
 PgOrderStore / PgAuditSink against a real Postgres with migration kraken_002 applied.
 
-Run inside the app container (Postgres is not exposed to the host):
+Run inside the app container (Postgres is not exposed to the host). Dev database only: it writes
+rows for user 'pg-test', including one append-only audit row that cannot be deleted.
+    docker compose exec app pip install pytest pytest-asyncio
     docker compose exec app python scripts/migrate.py
     docker compose exec -e KRAKEN_PG_TESTS=1 app python -m pytest tests/integration/test_order_store_pg.py -q
 Skipped unless KRAKEN_PG_TESTS=1 and DATABASE_URL points at a database with the order tables.

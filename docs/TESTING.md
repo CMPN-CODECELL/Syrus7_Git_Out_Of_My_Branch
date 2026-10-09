@@ -74,9 +74,12 @@ The Level 2 tests share [tests/fakes/orders_world.py](../tests/fakes/orders_worl
 The Postgres order store has its own tests, which need a database. Run them in the container:
 
 ```bash
+docker compose exec app pip install pytest pytest-asyncio   # the image ships runtime deps only; lasts until rebuild
 docker compose exec app python scripts/migrate.py
 docker compose exec -e KRAKEN_PG_TESTS=1 app python -m pytest tests/integration/test_order_store_pg.py -q
 ```
+
+These tests write rows for user `pg-test` to the database. The audit test adds one row that can't be deleted (append-only by design), so run them against a dev database only.
 
 The other `tests/integration` and `tests/e2e` files are inherited and need Postgres/Redis; CI doesn't run them.
 

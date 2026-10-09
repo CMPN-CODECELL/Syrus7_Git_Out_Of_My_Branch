@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Shani Options quantitative analytics and real-time options Greeks terminal for Indian equity derivatives (NSE/BSE).">
+    <title>Shani — Options Ingestion & Greeks Terminal</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css?v=2.7.0">
+</head>
+<body class="light-theme" style="opacity: 0; transition: opacity 0.3s ease;">
+    <!-- Background Particle Canvas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Top Brand Navbar -->
+    <header class="dashboard-header">
+        <div class="nse-container" style="max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 32px;">
+                <a href="/" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+                    <img src="/Shani-logo.svg" alt="Shani Logo" style="width: 34px; height: 34px; flex-shrink: 0;">
+                    <span class="logo-brand-text">Shani</span>
+                </a>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <a href="/" class="dash-nav-link">Home</a>
+                    <a href="#" id="tab-option-chain" class="dash-nav-link active">Option Chain</a>
+                    <a href="#" id="tab-technicals" class="dash-nav-link">Technicals</a>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <button id="notification-bell-btn" class="ast-nav-btn" title="Real-Time Alerts">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    <span style="font-size: 13px; font-weight: 600;">Alerts</span>
+                    <span id="alert-badge-count" style="display: none; background: #ef4444; color: white; border-radius: 10px; font-size: 10px; padding: 1px 6px; font-weight: 700;">0</span>
+                </button>
+                <div id="user-profile-badge" style="display: flex; align-items: center; gap: 10px; color: var(--text-primary); font-size: 14px; font-weight: 500; cursor: pointer;">
+                    <div id="user-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f37021, #d8560c); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: white; box-shadow: 0 2px 8px rgba(243, 112, 33, 0.4);">?</div>
+                    <span id="user-name-display">Loading...</span>
+                </div>
+                <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle Light/Dark Theme">
+                    <svg id="theme-toggle-dark-icon" style="display:none;" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c.44-.06.9-.1 1.36-.1A9 9 0 0 0 12 3z"/></svg>
+                    <svg id="theme-toggle-light-icon" style="display:none;" viewBox="0 0 24 24"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1zm0 16a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1zm9-7a1 1 0 0 1-1 1h-2a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1zm-16 0a1 1 0 0 1-1 1H3a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1zm14.85-6.9a1 1 0 0 1 0 1.41l-1.41 1.41a1 1 0 1 1-1.41-1.41l1.41-1.41a1 1 0 0 1 1.41 0zM6.9 14.85a1 1 0 0 1 0 1.41l-1.41 1.41a1 1 0 0 1-1.41-1.41l1.41-1.41a1 1 0 0 1 1.41 0zm11.05 0a1 1 0 0 1 1.41 0l1.41 1.41a1 1 0 0 1-1.41 1.41l-1.41-1.41a1 1 0 0 1 0-1.41zM6.9 6.9a1 1 0 0 1 1.41 0L9.72 8.3a1 1 0 1 1-1.41 1.41L6.9 8.3a1 1 0 0 1 0-1.41z"/></svg>
+                </button>
+                <button id="logout-btn" class="ast-nav-btn">Logout</button>
+            </div>
+        </div>
+    </header>
+
+
+    <div id="option-chain-view-container" class="nse-container main-content">
+        <!-- Header -->
+        <div class="nse-header">
+            <h1 class="nse-title">Options Chain & Greeks Real-Time Terminal</h1>
+        </div>
+
+        <!-- Filters Box -->
+        <div class="nse-filters-box">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="symbol-search-input">Search Instrument (Indices/Stocks):</label>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" id="symbol-search-input" placeholder="Type NIFTY, RELIANCE, TCS..." value="NIFTY" autocomplete="off">
+                        <div id="search-suggestions" class="suggestions-dropdown hidden"></div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label for="expiry-select">Expiry Date</label>
+                    <select id="expiry-select" style="min-width: 140px;">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="custom-expiry-date">Custom Expiry / DTE</label>
+                    <div class="custom-expiry-wrapper">
+                        <input type="date" id="custom-expiry-date" title="Custom Expiry Date">
+                        <div class="preset-btn-group">
+                            <button type="button" id="btn-exp-7" class="btn-preset" title="7 Days to Expiry">7D</button>
+                            <button type="button" id="btn-exp-14" class="btn-preset" title="14 Days to Expiry">14D</button>
+                            <button type="button" id="btn-exp-30" class="btn-preset" title="30 Days to Expiry">30D</button>
+                        </div>
+                        <span id="terminal-dte-badge" class="dte-badge" title="Days to Expiry">30 DTE</span>
+                    </div>
+                </div>
+                <div class="filter-group action-group">
+                    <label style="visibility: hidden;">Action</label>
+                    <button id="main-search-btn" class="main-search-action-btn">Search</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Watchlist Bar -->
+        <div class="nse-watchlist-bar">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px;" id="watchlist-container">
+                <span style="font-weight: 600; color: var(--text-primary); margin-right: 8px;">
+                    <i class="fas fa-star" style="color: #f59e0b; margin-right: 4px;"></i> My Watchlist:
+                </span>
+                <div id="watchlist-items" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <span style="color: var(--text-secondary); font-size: 13px; font-style: italic;" id="watchlist-empty-msg">Loading...</span>
+                </div>
+            </div>
+            <button id="add-to-watchlist-btn" style="padding: 6px 12px; background-color: #10b981; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px; transition: background-color 0.2s;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                Add <span id="watchlist-current-symbol" style="margin-left:2px;">NIFTY</span>
+            </button>
+        </div>
+
+        <!-- Info and Actions Bar -->
+        <div class="nse-info-bar">
+            <div class="nse-underlying-info">
+                Underlying Index: <span id="underlying-symbol" class="bold-text">NIFTY</span> 
+                <span id="underlying-price" class="bold-text price-text">--</span> 
+                <span class="gray-text">As on</span> 
+                <span id="underlying-time" class="bold-text">--</span>
+                <span id="underlying-time-elapsed" class="gray-text" style="font-size: 11px; margin-left: 6px; font-weight: 500;"></span>
+                <button id="reload-btn" class="nse-reload-icon" title="Reload Data">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                        <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="nse-action-links" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div class="ast-view-controls">
+                    <button id="view-standard-btn" class="ast-view-btn active" title="Calls & Puts Side-by-Side">Standard</button>
+                    <button id="view-calls-btn" class="ast-view-btn" title="Call Options Only">Calls Only</button>
+                    <button id="view-puts-btn" class="ast-view-btn" title="Put Options Only">Puts Only</button>
+                    <button id="view-greeks-btn" class="ast-view-btn" title="Inlined Greeks Details">Greeks</button>
+                </div>
+                <div class="ast-view-controls">
+                    <button id="toggle-full-chain-btn" class="ast-view-btn" title="Toggle between 40 strikes and Full Option Chain">Show Full Chain</button>
+                </div>
+                <span class="divider">|</span>
+                <a href="/user_manual.html" id="user-manual-btn" class="nse-action-link">User Manual</a>
+                <span class="divider">|</span>
+                <a href="/terms.html" id="terms-btn" class="nse-action-link">Terms of Use</a>
+                <span class="divider">|</span>
+                <button id="open-bsm-modal-btn" class="nse-csv-btn" style="background-color: var(--accent-indigo); border-color: var(--accent-indigo); color: white;" title="Open BSM Control Panel">
+                    BSM Control Panel
+                </button>
+                <span class="divider">|</span>
+                <button id="download-csv-btn" class="nse-csv-btn">
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                        <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                    </svg>
+                    Download (.xlsx)
+                </button>
+                <span class="divider">|</span>
+                <button id="open-research-export-btn" class="nse-csv-btn" style="background-color: #2563eb; border-color: #2563eb; color: white;" title="Download Multi-Day Research Excel">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Multi-Day Export
+                </button>
+            </div>
+        </div>
+
+
+
+
+        <!-- Option Chain Container -->
+        <div class="nse-table-outer-wrapper">
+            <div class="nse-table-wrapper" id="chain-table-container">
+                <table class="nse-option-chain-table" id="option-chain-table">
+                    <thead>
+                        <!-- Calls / Strikes / Puts Super Header -->
+                        <tr class="super-header">
+                            <th colspan="9" class="calls-super">CALLS</th>
+                            <th class="strike-super">STRIKE</th>
+                            <th colspan="9" class="puts-super">PUTS</th>
+                        </tr>
+                        <!-- Sub Columns Header -->
+                        <tr class="sub-header">
+                            <th title="Chart Link"></th>
+                            <th title="Volume">VOLUME</th>
+                            <th title="Implied Volatility">IV</th>
+                            <th title="BSM Theoretical Price" class="bs-col">BS PRICE</th>
+                            <th title="Last Traded Price">LTP</th>
+                            <th title="Bid Quantity">BID QTY</th>
+                            <th title="Bid Price">BID</th>
+                            <th title="Ask Price">ASK</th>
+                            <th title="Ask Quantity">ASK QTY</th>
+                            
+                            <th title="Strike Price" class="strike-col">STRIKE</th>
+                            
+                            <th title="Bid Quantity">BID QTY</th>
+                            <th title="Bid Price">BID</th>
+                            <th title="Ask Price">ASK</th>
+                            <th title="Ask Quantity">ASK QTY</th>
+                            <th title="Last Traded Price">LTP</th>
+                            <th title="BSM Theoretical Price" class="bs-col">BS PRICE</th>
+                            <th title="Implied Volatility">IV</th>
+                            <th title="Volume">VOLUME</th>
+                            <th title="Chart Link"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="option-chain-tbody">
+                        <!-- Placed dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Technical Analysis Dashboard Container -->
+    <div id="technicals-view-container" class="nse-container technicals-container" style="display: none; margin-top: 20px; margin-bottom: 40px;">
+        <!-- Technical Summary Hero Card -->
+        <div class="tech-card tech-summary-card">
+            <div class="tech-summary-header">
+                <div>
+                    <h2 style="margin:0 0 6px 0; font-size: 22px; color: var(--text-primary); font-weight: 700;">
+                        Technical Indicators & Market Bias (<span id="tech-symbol-lbl">NIFTY</span>)
+                    </h2>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 13px;">Real-time quantitative indicators, moving averages, and oscillator signals.</p>
+                </div>
+                <div class="tech-overall-badge-wrapper">
+                    <span class="tech-badge badge-neutral" id="tech-overall-badge">--</span>
+                    <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600; display: block; text-align: center; margin-top: 4px;" id="tech-summary-counts">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Indicators Grid -->
+        <div class="tech-grid">
+            <!-- Card 1: Oscillators -->
+            <div class="tech-card">
+                <div class="tech-card-title">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    Oscillators & Momentum
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">RSI (14)</div>
+                        <div class="tech-metric-val font-mono" id="tech-rsi-val">--</div>
+                    </div>
+                    <div id="tech-rsi-badge-wrap"><span class="tech-pill pill-neutral" id="tech-rsi-pill">NEUTRAL</span></div>
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">MACD (12, 26, 9)</div>
+                        <div class="tech-metric-val font-mono" id="tech-macd-val">--</div>
+                    </div>
+                    <div id="tech-macd-badge-wrap"><span class="tech-pill pill-neutral" id="tech-macd-pill">NEUTRAL</span></div>
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">Bollinger Bands (20, 2)</div>
+                        <div class="tech-metric-sub" id="tech-bb-sub">Upper: -- | Lower: --</div>
+                    </div>
+                    <div id="tech-bb-badge-wrap"><span class="tech-pill pill-neutral" id="tech-bb-pill">NEUTRAL</span></div>
+                </div>
+            </div>
+
+            <!-- Card 2: Moving Averages -->
+            <div class="tech-card">
+                <div class="tech-card-title">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    Moving Averages
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">SMA 20</div>
+                        <div class="tech-metric-val font-mono" id="tech-sma20-val">--</div>
+                    </div>
+                    <div><span class="tech-pill pill-neutral" id="tech-sma20-pill">NEUTRAL</span></div>
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">SMA 50</div>
+                        <div class="tech-metric-val font-mono" id="tech-sma50-val">--</div>
+                    </div>
+                    <div><span class="tech-pill pill-neutral" id="tech-sma50-pill">NEUTRAL</span></div>
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">EMA 20</div>
+                        <div class="tech-metric-val font-mono" id="tech-ema20-val">--</div>
+                    </div>
+                    <div><span class="tech-pill pill-neutral" id="tech-ema20-pill">NEUTRAL</span></div>
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">EMA 50</div>
+                        <div class="tech-metric-val font-mono" id="tech-ema50-val">--</div>
+                    </div>
+                    <div><span class="tech-pill pill-neutral" id="tech-ema50-pill">NEUTRAL</span></div>
+                </div>
+            </div>
+
+            <!-- Card 3: Volatility & Pivot Points -->
+            <div class="tech-card">
+                <div class="tech-card-title">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"></path></svg>
+                    Pivots & Volatility (ATR)
+                </div>
+                <div class="tech-metric-row">
+                    <div>
+                        <div class="tech-metric-lbl">ATR (14) Volatility</div>
+                        <div class="tech-metric-val font-mono" id="tech-atr-val">--</div>
+                    </div>
+                    <div><span class="tech-pill pill-neutral">NORMAL</span></div>
+                </div>
+                <div style="margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
+                    <div class="tech-metric-lbl" style="margin-bottom: 8px;">Pivot Levels (Floor)</div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px;" class="font-mono">
+                        <div class="pivot-pill-r">R3: <span id="tech-r3">--</span></div>
+                        <div class="pivot-pill-r">R2: <span id="tech-r2">--</span></div>
+                        <div class="pivot-pill-r">R1: <span id="tech-r1">--</span></div>
+                        <div class="pivot-pill-p">Pivot (P): <span id="tech-pivot">--</span></div>
+                        <div class="pivot-pill-s">S1: <span id="tech-s1">--</span></div>
+                        <div class="pivot-pill-s">S2: <span id="tech-s2">--</span></div>
+                        <div class="pivot-pill-s">S3: <span id="tech-s3">--</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Premium Shani Brand Footer -->
+    <footer class="nse-footer">
+        <div class="nse-container footer-grid">
+            <div class="footer-brand-section">
+                <div class="footer-logo">
+                    <span class="logo-accent">Shani</span>
+                </div>
+                <p class="footer-desc">Professional-grade derivatives analytics and real-time options chain valuation using advanced Black-Scholes-Merton models.</p>
+                <div class="footer-socials">
+                    <span class="system-status-indicator">
+                        <span class="status-dot animate-pulse"></span> Live Market Feed Active
+                    </span>
+                </div>
+            </div>
+            
+            <div class="footer-links-section">
+                <h4>Resources</h4>
+                <ul class="footer-links-list">
+                    <li><a href="/user_manual.html" id="footer-user-manual-btn" class="footer-link">User Manual</a></li>
+                    <li><a href="/terms.html" id="footer-terms-btn" class="footer-link">Terms & Conditions</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-disclosure-section">
+                <h4>Regulatory Notice</h4>
+                <div class="regulatory-disclosure-box">
+                    <p class="disclosure-title">Risk Disclosure (SEBI Guidelines)</p>
+                    <p class="footer-regulatory-alert">Disclaimer: Futures, options, and derivatives trading involve substantial risk of loss and are not suitable for every investor. Please review risk warnings carefully before trading.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer-bottom-bar">
+            <div class="nse-container bottom-bar-content">
+                <p class="footer-copyright">&copy; 2026 Shani Option Chain Analytics. All rights reserved.</p>
+                <div class="footer-bottom-meta">
+                    <span class="footer-best-view">Best viewed in modern web browsers</span>
+                    <span class="footer-divider">|</span>
+                    <span class="footer-version">v2.1.0</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Greeks Inspection Modal -->
+    <div id="greeks-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Option Strike Analysis</h2>
+                <span class="close-btn" id="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-strikes-header">
+                    Strike Price: <span id="modal-strike-price" class="bold-text">--</span>
+                </div>
+                <div class="modal-tables-grid">
+                    <table class="modal-data-table">
+                        <thead>
+                            <tr class="calls-super"><th colspan="2">CALL OPTION</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Market Price (LTP)</td><td id="modal-c-ltp" class="font-mono">--</td></tr>
+                            <tr class="highlight-row"><td>BSM Theoretical Price</td><td id="modal-c-bs-val" class="font-mono bold">--</td></tr>
+                            <tr><td>Theoretical Edge</td><td id="modal-c-edge" class="font-mono">--</td></tr>
+                            <tr><td>Delta (Δ)</td><td id="modal-c-delta" class="font-mono">--</td></tr>
+                            <tr><td>Gamma (Γ)</td><td id="modal-c-gamma" class="font-mono">--</td></tr>
+                            <tr><td>Vega (ν)</td><td id="modal-c-vega" class="font-mono">--</td></tr>
+                            <tr><td>Theta (θ/day)</td><td id="modal-c-theta" class="font-mono">--</td></tr>
+                            <tr><td>Rho (ρ)</td><td id="modal-c-rho" class="font-mono">--</td></tr>
+                        </tbody>
+                    </table>
+
+                    <table class="modal-data-table">
+                        <thead>
+                            <tr class="puts-super"><th colspan="2">PUT OPTION</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Market Price (LTP)</td><td id="modal-p-ltp" class="font-mono">--</td></tr>
+                            <tr class="highlight-row"><td>BSM Theoretical Price</td><td id="modal-p-bs-val" class="font-mono bold">--</td></tr>
+                            <tr><td>Theoretical Edge</td><td id="modal-p-edge" class="font-mono">--</td></tr>
+                            <tr><td>Delta (Δ)</td><td id="modal-p-delta" class="font-mono">--</td></tr>
+                            <tr><td>Gamma (Γ)</td><td id="modal-p-gamma" class="font-mono">--</td></tr>
+                            <tr><td>Vega (ν)</td><td id="modal-p-vega" class="font-mono">--</td></tr>
+                            <tr><td>Theta (θ/day)</td><td id="modal-p-theta" class="font-mono">--</td></tr>
+                            <tr><td>Rho (ρ)</td><td id="modal-p-rho" class="font-mono">--</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="modal-inputs-box">
+                    <h4>Active Model Parameters</h4>
+                    <div class="modal-inputs-flex">
+                        <div>Spot Price: <span id="modal-in-spot" class="font-mono bold">--</span></div>
+                        <div>Volatility: <span id="modal-in-vol" class="font-mono bold">--</span></div>
+                        <div>Days to Expiry: <span id="modal-in-days" class="font-mono bold">--</span></div>
+                        <div>Risk-Free Rate: <span id="modal-in-rate" class="font-mono bold">--</span></div>
+                        <div>Dividend Yield: <span id="modal-in-div" class="font-mono bold">--</span></div>
+                    </div>
+                    <div class="modal-param-notes">
+                        d₁ = <span id="modal-d1" class="font-mono">--</span> | 
+                        d₂ = <span id="modal-d2" class="font-mono">--</span> | 
+                        N(d₁) = <span id="modal-nd1" class="font-mono">--</span> | 
+                        N(d₂) = <span id="modal-nd2" class="font-mono">--</span>
+                    </div>
+                </div>
+
+                <h3 class="modal-section-title">Market & Order Book Data</h3>
+                <div class="modal-tables-grid">
+                    <table class="modal-data-table">
+                        <thead>
+                            <tr class="calls-super"><th colspan="2">CALL MARKET DATA</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Open Interest (OI)</td><td id="modal-c-oi" class="font-mono">--</td></tr>
+                            <tr><td>Change in OI</td><td id="modal-c-oi-chg" class="font-mono">--</td></tr>
+                            <tr><td>Volume</td><td id="modal-c-volume" class="font-mono">--</td></tr>
+                            <tr><td>Implied Volatility (IV)</td><td id="modal-c-iv" class="font-mono">--</td></tr>
+                            <tr><td>Net Change</td><td id="modal-c-chg" class="font-mono">--</td></tr>
+                            <tr><td>Bid Price</td><td id="modal-c-bid-price" class="font-mono">--</td></tr>
+                            <tr><td>Bid Quantity</td><td id="modal-c-bid-qty" class="font-mono">--</td></tr>
+                            <tr><td>Ask Price</td><td id="modal-c-ask-price" class="font-mono">--</td></tr>
+                            <tr><td>Ask Quantity</td><td id="modal-c-ask-qty" class="font-mono">--</td></tr>
+                        </tbody>
+                    </table>
+
+                    <table class="modal-data-table">
+                        <thead>
+                            <tr class="puts-super"><th colspan="2">PUT MARKET DATA</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Open Interest (OI)</td><td id="modal-p-oi" class="font-mono">--</td></tr>
+                            <tr><td>Change in OI</td><td id="modal-p-oi-chg" class="font-mono">--</td></tr>
+                            <tr><td>Volume</td><td id="modal-p-volume" class="font-mono">--</td></tr>
+                            <tr><td>Implied Volatility (IV)</td><td id="modal-p-iv" class="font-mono">--</td></tr>
+                            <tr><td>Net Change</td><td id="modal-p-chg" class="font-mono">--</td></tr>
+                            <tr><td>Bid Price</td><td id="modal-p-bid-price" class="font-mono">--</td></tr>
+                            <tr><td>Bid Quantity</td><td id="modal-p-bid-qty" class="font-mono">--</td></tr>
+                            <tr><td>Ask Price</td><td id="modal-p-ask-price" class="font-mono">--</td></tr>
+                            <tr><td>Ask Quantity</td><td id="modal-p-ask-qty" class="font-mono">--</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Day Research Export Modal -->
+    <div id="research-export-modal" class="modal">
+        <div class="modal-content" style="max-width: 520px; padding: 24px;">
+            <div class="modal-header" style="background-color: transparent !important; padding: 0 0 16px 0 !important; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">
+                    Multi-Day Historical Research Export
+                </h2>
+                <span class="close-btn" id="research-export-modal-close" style="cursor: pointer; font-size: 24px; color: var(--text-secondary);">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 16px 0 0 0;">
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+                    Generate a multi-sheet Excel file (.xlsx) for a custom date period.
+                    Includes full Option Chains, Black-Scholes theoretical pricing, and Technical Indicators for each trading day.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <div>
+                        <label for="research-export-symbol" style="font-size: 13px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 6px;">Symbol</label>
+                        <input type="text" id="research-export-symbol" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); font-weight: 600;" value="NIFTY">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <label for="research-export-start-date" style="font-size: 13px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 6px;">Start Date</label>
+                            <input type="date" id="research-export-start-date" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label for="research-export-end-date" style="font-size: 13px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 6px;">End Date</label>
+                            <input type="date" id="research-export-end-date" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary);">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Quick Presets:</span>
+                        <button type="button" class="preset-btn" data-days="7" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card-header); color: var(--text-primary); cursor: pointer;">Past 7 Days</button>
+                        <button type="button" class="preset-btn" data-days="14" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card-header); color: var(--text-primary); cursor: pointer;">Past 14 Days</button>
+                        <button type="button" class="preset-btn" data-days="30" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card-header); color: var(--text-primary); cursor: pointer;">Past 30 Days</button>
+                    </div>
+                    <div>
+                        <label for="research-export-layout" style="font-size: 13px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 6px;">Excel Layout Mode</label>
+                        <select id="research-export-layout" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary);">
+                            <option value="separate_tabs">Separate Tabs (2 Sheets per Day: Option Chain + Technicals)</option>
+                            <option value="combined_per_day">Combined (1 Sheet per Day: Option Chain & Technicals)</option>
+                        </select>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button id="trigger-research-export-btn" style="width: 100%; padding: 10px; background-color: var(--accent-indigo); color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download Research Excel (.xlsx)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info & Regulatory Center Modal -->
+    <div id="info-modal" class="modal">
+        <div class="modal-content info-modal-content">
+            <div class="modal-header info-modal-header">
+                <h2>Shani Information & Regulatory Center</h2>
+                <span class="close-btn" id="info-modal-close">&times;</span>
+            </div>
+            <div class="info-modal-tabs">
+                <button class="info-tab-btn active" data-tab="user-manual">User Manual</button>
+                <button class="info-tab-btn" data-tab="terms-conditions">Regulatory Terms & Conditions</button>
+                <button class="info-tab-btn" data-tab="greeks-ref">Greeks Guide</button>
+            </div>
+            <div class="modal-body info-modal-body">
+                <!-- User Manual Tab -->
+                <div id="user-manual" class="info-tab-content active">
+                    <h3 class="info-section-title">Website User Guide</h3>
+                    <p class="info-p">Welcome to <strong>Shani Option Chain Analytics</strong>. This dashboard replicates the official National Stock Exchange of India (NSE) equity derivatives option chain layout, enhanced with real-time derivative valuations, theoretical Black-Scholes-Merton (BSM) prices, and real-time Greek computations.</p>
+                    
+                    <div class="guide-grid">
+                        <div class="guide-card">
+                            <h4>Dynamic Search & Filters</h4>
+                            <p>Use the search box in the top filter bar to look up active stock symbols or indices (e.g., <code>NIFTY</code>, <code>RELIANCE</code>, <code>TCS</code>) traded on the NSE. The system auto-completes and fetches active parameters. Filter option expiry dates or isolate specific strikes from the drop-downs.</p>
+                        </div>
+                        <div class="guide-card">
+                            <h4>Black-Scholes-Merton Calculator</h4>
+                            <p>Adjust variables in the BSM Control Panel to simulate pricing environments:</p>
+                            <ul>
+                                <li><strong>Spot Price:</strong> Base underlying asset value (supports slide scaling).</li>
+                                <li><strong>Volatility (σ %):</strong> Standard deviation of underlying returns.</li>
+                                <li><strong>Days to Expiry:</strong> Time remaining until derivative settlement.</li>
+                                <li><strong>Risk-Free Rate:</strong> Prevailing interest rate environment (e.g. 6.50%).</li>
+                                <li><strong>Dividend Yield:</strong> Continuous cash payouts of stock or index.</li>
+                            </ul>
+                        </div>
+                        <div class="guide-card">
+                            <h4>Option Chain Shading & Pricing Highlights</h4>
+                            <p><strong>ITM Shading:</strong> Pale yellow highlights show in-the-money strikes (calls under spot, puts above spot).</p>
+                            <p><strong>Underpriced / Overpriced Fields (BS PRICE):</strong> Comparing BSM fair price with market Last Traded Price (LTP):</p>
+                            <ul>
+                                <li><span class="label-teal">Teal Green:</span> Market price is <em>Underpriced</em> compared to BSM model (Theoretical Edge available).</li>
+                                <li><span class="label-orange">Orange Red:</span> Market price is <em>Overpriced</em> compared to BSM model.</li>
+                            </ul>
+                        </div>
+                        <div class="guide-card">
+                            <h4>Strike Greeks Analysis</h4>
+                            <p>Click on any <strong>Strike Price</strong> cell or <strong>LTP</strong> value to launch the Greeks Inspection Modal. This reveals detailed mathematical parameters (d₁, d₂, N(d₁), N(d₂)) and active model outputs (Delta, Gamma, Vega, Theta, Rho) for both Call and Put contracts on that specific strike.</p>
+                        </div>
+                        <div class="guide-card" style="grid-column: span 2;">
+                            <h4>Technical Indicators & Market Signals</h4>
+                            <p>The <strong>Technicals</strong> tab computes quantitative signals, trend indicators, and floor pivot levels:</p>
+                            <ul>
+                                <li><strong>RSI (14):</strong> Relative Strength Index. Values &ge;70 signal Overbought (Bearish alert), &le;30 signal Oversold (Bullish alert).</li>
+                                <li><strong>MACD (12, 26, 9):</strong> Moving Average Convergence Divergence. Crossovers above signal line indicate Bullish trend.</li>
+                                <li><strong>Bollinger Bands (20, 2):</strong> 20-period moving average with &plusmn;2 standard deviation envelopes.</li>
+                                <li><strong>Moving Averages (SMA & EMA 20/50):</strong> Simple and Exponential moving averages. Spot &ge; MA indicates Bullish bias.</li>
+                                <li><strong>ATR (14):</strong> Average True Range measuring price volatility amplitude.</li>
+                                <li><strong>Floor Pivots:</strong> Intraday Pivot (P), Resistance (R1-R3), and Support (S1-S3) levels calculated from prior price history.</li>
+                                <li><strong>Composite Score:</strong> Aggregates 7 indicator signals into overall bias (Strong Bullish, Bullish, Neutral, Bearish, Strong Bearish).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+ 
+                <!-- Terms & Conditions Tab -->
+                <div id="terms-conditions" class="info-tab-content">
+                    <h3 class="info-section-title">Regulatory Disclosures & Terms of Use</h3>
+                    
+                    <!-- SEBI Mandated Derivatives Warning -->
+                    <div class="sebi-warning-box">
+                        <h5>MANDATED REGULATORY DISCLOSURE (SEBI Guidelines)</h5>
+                        <p><strong>Risk Disclosures on Derivatives (Futures and Options):</strong></p>
+                        <ul>
+                            <li>9 out of 10 individual traders in equity derivatives segment incurred net losses.</li>
+                            <li>On an average, loss makers registered net trading loss close to ₹50,000.</li>
+                            <li>Over and above the net trading losses incurred, loss makers expended an additional 28% of net trading losses as transaction costs.</li>
+                            <li>Those making net profits, on an average, institutional/non-individual entities pocketed the bulk of the profits.</li>
+                        </ul>
+                    </div>
+
+                    <div class="terms-scroll-box">
+                        <h4>1. Theoretical and Analytical Models</h4>
+                        <p>All Black-Scholes-Merton (BSM) prices, Greeks (Delta, Gamma, Vega, Theta, Rho), and implied volatility calculations rendered on this website are simulated mathematical approximations. They are for educational, research, and analytical purposes only. They do not constitute actual exchange trading advice, quotes, or transactional execution services.</p>
+
+                        <h4>2. No Financial Advice or Recommendations</h4>
+                        <p>Shani is not a registered SEBI Investment Adviser (IA) or Research Analyst (RA). No calculations, outputs, search indexes, or pricing sheets on this website constitute investment, legal, tax, or trading advice, or a recommendation to buy, sell, or write any stock, derivative, or option contract. Users are entirely responsible for their own investment and trading decisions.</p>
+
+                        <h4>3. Exchange Data Source Limitation</h4>
+                        <p>Market data (LTP, OI, Volume, bid/ask spreads) displayed on this platform is processed through an automated ingestion catalog. While we strive to maintain high-quality tracking, data may be subject to ingestion latencies, inaccuracies, or standard transmission errors. Shani makes no warranties regarding the accuracy, completeness, or timeliness of data. For live execution, cross-reference data directly with official platforms of the National Stock Exchange of India (NSE India).</p>
+
+                        <h4>4. Assumption of Valuation Risks</h4>
+                        <p>Derivative pricing models make mathematical assumptions (e.g., constant volatility, log-normal distributions, constant interest rates) that frequently deviate from real-world market dynamics. Financial markets are subject to extreme tail risks, high volatility, bid-ask slippages, and liquidity dry-outs. Users who leverage these models assume all associated financial risks.</p>
+
+                        <h4>5. Intellectual Property</h4>
+                        <p>NSE, NIFTY, and related stock symbols are trademarks of the National Stock Exchange of India Limited and/or its affiliates. Shani is an independent analytical application and is not affiliated, endorsed, or partnered with NSE India.</p>
+                    </div>
+                </div>
+
+                <!-- Greeks Quick Reference Tab -->
+                <div id="greeks-ref" class="info-tab-content">
+                    <h3 class="info-section-title">Greeks Analytical Cheat Sheet</h3>
+                    <div class="greeks-reference-table-wrapper">
+                        <table class="greeks-reference-table">
+                            <thead>
+                                <tr>
+                                    <th>Greek Symbol</th>
+                                    <th>Represents</th>
+                                    <th>Call Option Dynamic</th>
+                                    <th>Put Option Dynamic</th>
+                                    <th>Trading Impact</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="bold-text">Delta (Δ)</td>
+                                    <td>Sensitivity to <strong>Underlying Price</strong> change.</td>
+                                    <td class="positive-val">Positive (0.0 to +1.0)</td>
+                                    <td class="negative-val">Negative (-1.0 to 0.0)</td>
+                                    <td>Measures equivalent asset exposure. Approximate probability of expiring ITM.</td>
+                                </tr>
+                                <tr>
+                                    <td class="bold-text">Gamma (Γ)</td>
+                                    <td>Sensitivity of <strong>Delta</strong> to underlying price change.</td>
+                                    <td>Positive (highest ATM)</td>
+                                    <td>Positive (highest ATM)</td>
+                                    <td>Indicates speed of Delta acceleration. High Gamma near expiry poses risk.</td>
+                                </tr>
+                                <tr>
+                                    <td class="bold-text">Vega (ν)</td>
+                                    <td>Sensitivity to <strong>Volatility (1% σ change)</strong>.</td>
+                                    <td>Positive</td>
+                                    <td>Positive</td>
+                                    <td>Measures exposure to market fear/pricing shifts. Crucial for earnings releases.</td>
+                                </tr>
+                                <tr>
+                                    <td class="bold-text">Theta (θ)</td>
+                                    <td>Sensitivity to <strong>Time Decay (1 day loss)</strong>.</td>
+                                    <td class="negative-val">Negative (erodes value)</td>
+                                    <td class="negative-val">Negative (erodes value)</td>
+                                    <td>Measures the bleeding rate of options value. Acceleration occurs in final 30 days.</td>
+                                </tr>
+                                <tr>
+                                    <td class="bold-text">Rho (ρ)</td>
+                                    <td>Sensitivity to <strong>Interest Rate (1% r change)</strong>.</td>
+                                    <td class="positive-val">Positive</td>
+                                    <td class="negative-val">Negative</td>
+                                    <td>Measures carrying cost effects. Higher significance for long-term options (LEAPs).</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Profile Modal -->
+    <div id="user-profile-modal" class="modal">
+        <div class="modal-content profile-modal-content">
+            <div class="modal-header profile-modal-header">
+                <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#f37021" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    User Account & Profile
+                </h2>
+                <span class="close-btn" id="profile-modal-close" style="color: #94a3b8; font-size: 24px; cursor: pointer;">&times;</span>
+            </div>
+            <div class="profile-avatar-banner">
+                <div id="profile-modal-avatar" class="profile-large-avatar">?</div>
+                <div class="profile-user-info-meta">
+                    <h3 id="profile-modal-name">Loading...</h3>
+                    <p id="profile-modal-email">--</p>
+                    <span id="profile-modal-provider" class="profile-meta-badge">Supabase Auth</span>
+                </div>
+            </div>
+            <form id="profile-form" class="profile-form-body" onsubmit="return false;">
+                <div class="profile-field-group">
+                    <label for="profile-full-name-input">Full Name</label>
+                    <input type="text" id="profile-full-name-input" class="profile-input" placeholder="Enter your full name" autocomplete="off">
+                </div>
+
+                <div class="profile-field-group">
+                    <label for="profile-email-input">Email Address</label>
+                    <input type="email" id="profile-email-input" class="profile-input" readonly title="Email cannot be changed directly">
+                </div>
+
+                <div class="profile-stats-grid">
+                    <div class="profile-stat-card">
+                        <div class="profile-stat-lbl">Account Status</div>
+                        <div class="profile-stat-val" style="color: #10b981; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span> Active
+                        </div>
+                    </div>
+                    <div class="profile-stat-card">
+                        <div class="profile-stat-lbl">Watchlist Items</div>
+                        <div id="profile-watchlist-count" class="profile-stat-val font-mono">0 items</div>
+                    </div>
+                </div>
+
+                <div id="profile-alert" class="profile-alert"></div>
+
+                <div class="profile-actions">
+                    <button type="button" id="profile-logout-btn" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 6px; padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;">
+                        Log Out
+                    </button>
+                    <button type="button" id="profile-save-btn" class="profile-save-btn">
+                        Save Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Supabase Auth Guard -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/supabaseClient.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            const supabase = await initSupabase();
+            if (!supabase) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (!session) {
+                window.location.href = '/login.html';
+            } else {
+                document.body.style.opacity = '1';
+                
+                supabase.auth.onAuthStateChange((event, session) => {
+                    if (event === 'SIGNED_OUT') {
+                        window.location.href = '/index.html';
+                    }
+                });
+
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', async () => {
+                        await supabase.auth.signOut();
+                    });
+                }
+
+                // Initialize Profile and Watchlist
+                initUserProfile(supabase, session.user);
+                initWatchlist(supabase, session.user.id);
+            }
+        });
+
+        function initUserProfile(supabase, currentUser) {
+            const nameDisplay = document.getElementById('user-name-display');
+            const avatarDisplay = document.getElementById('user-avatar');
+            const profileBadge = document.getElementById('user-profile-badge');
+            
+            const profileModal = document.getElementById('user-profile-modal');
+            const profileModalClose = document.getElementById('profile-modal-close');
+            const profileModalName = document.getElementById('profile-modal-name');
+            const profileModalEmail = document.getElementById('profile-modal-email');
+            const profileModalAvatar = document.getElementById('profile-modal-avatar');
+            const profileModalProvider = document.getElementById('profile-modal-provider');
+            const profileFullNameInput = document.getElementById('profile-full-name-input');
+            const profileEmailInput = document.getElementById('profile-email-input');
+            const profileWatchlistCount = document.getElementById('profile-watchlist-count');
+            const profileSaveBtn = document.getElementById('profile-save-btn');
+            const profileLogoutBtn = document.getElementById('profile-logout-btn');
+            const profileAlert = document.getElementById('profile-alert');
+
+            let userState = currentUser;
+
+            function updateHeaderBadge(user) {
+                let fullName = user.user_metadata?.full_name || user.email;
+                let initials = '?';
+                
+                if (fullName) {
+                    nameDisplay.textContent = fullName;
+                    const names = fullName.trim().split(' ').filter(n => n);
+                    if (names.length > 1) {
+                        initials = (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                    } else if (names.length === 1 && names[0].length >= 2) {
+                        initials = names[0].substring(0, 2).toUpperCase();
+                    } else if (names.length === 1) {
+                        initials = names[0][0].toUpperCase();
+                    }
+                    avatarDisplay.textContent = initials;
+                    if (profileModalAvatar) profileModalAvatar.textContent = initials;
+                } else {
+                    nameDisplay.textContent = 'User';
+                    avatarDisplay.textContent = '?';
+                    if (profileModalAvatar) profileModalAvatar.textContent = '?';
+                }
+            }
+
+            updateHeaderBadge(userState);
+
+            // Open Profile Modal when clicking header badge
+            if (profileBadge) {
+                profileBadge.addEventListener('click', async () => {
+                    let fullName = userState.user_metadata?.full_name || '';
+                    let email = userState.email || '';
+
+                    profileFullNameInput.value = fullName;
+                    profileEmailInput.value = email;
+                    profileModalName.textContent = fullName || email;
+                    profileModalEmail.textContent = email;
+
+                    const provider = userState.app_metadata?.provider || 'Email/Password';
+                    profileModalProvider.textContent = provider.toUpperCase() + ' AUTH';
+
+                    // Fetch watchlist count for profile stats
+                    try {
+                        const { count, error } = await supabase
+                            .from('watchlists')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('user_id', userState.id);
+                        if (!error && count !== null) {
+                            profileWatchlistCount.textContent = count + (count === 1 ? ' item' : ' items');
+                        }
+                    } catch (e) {
+                        console.error("Watchlist count error:", e);
+                    }
+
+                    if (profileAlert) profileAlert.style.display = 'none';
+                    profileModal.classList.add('show');
+                });
+            }
+
+            // Close modal handlers
+            if (profileModalClose) {
+                profileModalClose.addEventListener('click', () => {
+                    profileModal.classList.remove('show');
+                });
+            }
+
+            window.addEventListener('click', (e) => {
+                if (e.target === profileModal) {
+                    profileModal.classList.remove('show');
+                }
+            });
+
+            // Save profile functionality
+            if (profileSaveBtn) {
+                profileSaveBtn.addEventListener('click', async () => {
+                    const newName = profileFullNameInput.value.trim();
+                    profileSaveBtn.disabled = true;
+                    profileSaveBtn.textContent = 'Saving...';
+                    if (profileAlert) profileAlert.style.display = 'none';
+
+                    try {
+                        // 1. Update Supabase Auth user metadata
+                        const { data, error: authError } = await supabase.auth.updateUser({
+                            data: { full_name: newName }
+                        });
+
+                        if (authError) throw authError;
+
+                        // 2. Upsert to public.users table
+                        const { error: dbError } = await supabase
+                            .from('users')
+                            .upsert({
+                                id: userState.id,
+                                email: userState.email,
+                                full_name: newName
+                            });
+
+                        if (dbError) console.warn("DB profile upsert warning:", dbError.message);
+
+                        if (data?.user) {
+                            userState = data.user;
+                            updateHeaderBadge(userState);
+                            profileModalName.textContent = newName || userState.email;
+                        }
+
+                        if (profileAlert) {
+                            profileAlert.className = 'profile-alert profile-alert-success';
+                            profileAlert.textContent = 'Profile updated successfully!';
+                            profileAlert.style.display = 'block';
+                        }
+                    } catch (err) {
+                        console.error('Error updating profile:', err);
+                        if (profileAlert) {
+                            profileAlert.className = 'profile-alert profile-alert-error';
+                            profileAlert.textContent = err.message || 'Failed to update profile';
+                            profileAlert.style.display = 'block';
+                        }
+                    } finally {
+                        profileSaveBtn.disabled = false;
+                        profileSaveBtn.textContent = 'Save Profile';
+                    }
+                });
+            }
+
+            // Logout from modal
+            if (profileLogoutBtn) {
+                profileLogoutBtn.addEventListener('click', async () => {
+                    await supabase.auth.signOut();
+                });
+            }
+        }
+
+
+        function initWatchlist(supabase, userId) {
+            const addBtn = document.getElementById('add-to-watchlist-btn');
+            const itemsContainer = document.getElementById('watchlist-items');
+            const emptyMsg = document.getElementById('watchlist-empty-msg');
+            const currentSymbolEl = document.getElementById('watchlist-current-symbol');
+            const underlyingSymbol = document.getElementById('underlying-symbol');
+            const searchInput = document.getElementById('symbol-search-input');
+            const searchBtn = document.getElementById('main-search-btn');
+
+            let currentWatchlist = [];
+
+            // Load Watchlist
+            async function loadWatchlist() {
+                const { data, error } = await supabase
+                    .from('watchlists')
+                    .select('id, symbol')
+                    .eq('user_id', userId)
+                    .order('added_at', { ascending: true });
+
+                if (error) {
+                    console.error('Error fetching watchlist:', error);
+                    emptyMsg.textContent = 'Error loading watchlist';
+                    return;
+                }
+
+                currentWatchlist = data || [];
+                renderWatchlist();
+            }
+
+            // Render Watchlist
+            function renderWatchlist() {
+                itemsContainer.innerHTML = '';
+                
+                if (currentWatchlist.length === 0) {
+                    itemsContainer.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px; font-style: italic;">No symbols added yet.</span>';
+                    return;
+                }
+
+                currentWatchlist.forEach(item => {
+                    const badge = document.createElement('div');
+                    badge.className = 'ast-watchlist-badge';
+                    
+                    // Click badge to search
+                    badge.addEventListener('click', () => {
+                        if (searchInput && searchBtn) {
+                            searchInput.value = item.symbol;
+                            searchBtn.click();
+                        }
+                    });
+                    
+                    const symbolText = document.createElement('span');
+                    symbolText.textContent = item.symbol;
+                    
+                    const removeBtn = document.createElement('span');
+                    removeBtn.className = 'remove-btn';
+                    removeBtn.innerHTML = '&times;';
+                    
+                    // Remove click handler
+                    removeBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation(); // prevent searching
+                        
+                        const { error } = await supabase
+                            .from('watchlists')
+                            .delete()
+                            .eq('id', item.id);
+                            
+                        if (!error) {
+                            loadWatchlist();
+                        } else {
+                            console.error('Error deleting from watchlist:', error);
+                        }
+                    });
+
+                    badge.appendChild(symbolText);
+                    badge.appendChild(removeBtn);
+                    itemsContainer.appendChild(badge);
+                });
+                
+                checkCurrentSymbol();
+            }
+
+            // Check if current symbol is already in watchlist to toggle button state
+            function checkCurrentSymbol() {
+                const symbol = currentSymbolEl.textContent;
+                const exists = currentWatchlist.some(item => item.symbol === symbol);
+                
+                if (exists) {
+                    addBtn.style.backgroundColor = '#d1d5db';
+                    addBtn.style.color = '#4b5563';
+                    addBtn.style.cursor = 'not-allowed';
+                    addBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Added';
+                    addBtn.disabled = true;
+                } else {
+                    addBtn.style.backgroundColor = '#10b981';
+                    addBtn.style.color = 'white';
+                    addBtn.style.cursor = 'pointer';
+                    addBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg> Add <span style="margin-left:2px;">' + symbol + '</span>';
+                    addBtn.disabled = false;
+                }
+            }
+
+            // Add to Watchlist
+            addBtn.addEventListener('click', async () => {
+                const symbol = currentSymbolEl.textContent;
+                if (!symbol || addBtn.disabled) return;
+                
+                addBtn.innerHTML = '<span style="font-size: 11px;">Adding...</span>';
+                addBtn.disabled = true;
+
+                const { error } = await supabase
+                    .from('watchlists')
+                    .insert([{ user_id: userId, symbol: symbol }]);
+
+                if (error) {
+                    console.error('Error adding to watchlist:', error);
+                    alert("Could not add to watchlist: " + error.message);
+                    checkCurrentSymbol(); // reset button
+                } else {
+                    loadWatchlist();
+                }
+            });
+
+            // Observe underlying symbol changes to update the "Add" button target
+            if (underlyingSymbol) {
+                const observer = new MutationObserver((mutations) => {
+                    for (let mutation of mutations) {
+                        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                            const newSymbol = underlyingSymbol.textContent.trim();
+                            if (newSymbol && newSymbol !== '--') {
+                                currentSymbolEl.textContent = newSymbol;
+                                checkCurrentSymbol();
+                            }
+                        }
+                    }
+                });
+                observer.observe(underlyingSymbol, { childList: true, characterData: true, subtree: true });
+                
+                // initial set
+                if (underlyingSymbol.textContent && underlyingSymbol.textContent !== '--') {
+                    currentSymbolEl.textContent = underlyingSymbol.textContent;
+                }
+            }
+
+            // Initial Load
+            loadWatchlist();
+        }
+    </script>
+
+    <!-- Notification Alert Rules Modal -->
+    <div id="alerts-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Real-Time Market Alerts & Notifications</h2>
+                <span class="close-btn" id="alerts-modal-close">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <form id="create-alert-form">
+                    <h4>Create Market Alert Rule</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="alert-field-group">
+                            <label for="alert-symbol-input">Symbol</label>
+                            <input type="text" id="alert-symbol-input" value="NIFTY">
+                        </div>
+                        <div class="alert-field-group">
+                            <label for="alert-condition-select">Condition</label>
+                            <select id="alert-condition-select">
+                                <option value="ABOVE_PRICE">Price Above Threshold</option>
+                                <option value="BELOW_PRICE">Price Below Threshold</option>
+                                <option value="IV_SPIKE">Implied Volatility Spike (%)</option>
+                                <option value="DELTA_BREACH">Delta Breach</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                        <div class="alert-field-group">
+                            <label for="alert-threshold-input">Threshold Value</label>
+                            <input type="number" id="alert-threshold-input" step="0.01" placeholder="e.g. 24500">
+                        </div>
+                        <div class="alert-field-group">
+                            <label for="alert-cooldown-input">Cooldown (Seconds)</label>
+                            <input type="number" id="alert-cooldown-input" value="300">
+                        </div>
+                    </div>
+                    <button type="submit" class="alert-submit-btn">Save Alert Rule</button>
+                </form>
+                <h4 class="active-alerts-title">Active Alert Rules</h4>
+                <div id="active-alerts-list" style="max-height: 200px; overflow-y: auto;">
+                    <div class="active-alert-empty">No alert rules configured.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BSM Control Panel Modal -->
+    <div id="bsm-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+            <div class="modal-header" style="background-color: var(--bg-card-header); padding: 12px 18px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary);">Black-Scholes-Merton (BSM) Control Panel</h2>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button id="reset-market-btn" class="btn-secondary">Reset to Market Values</button>
+                    <span class="close-btn" id="bsm-modal-close" style="font-size: 24px; cursor: pointer; color: var(--text-secondary);">&times;</span>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <!-- Apply Simulation toggle -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 12px 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 6px;">
+                    <span style="font-size: 12.5px; color: var(--text-secondary); font-weight: 500;">
+                        Enable this toggle to apply these simulated custom parameters to the main Option Chain table's BSM pricing column.
+                    </span>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--accent-orange);">
+                        <input type="checkbox" id="apply-simulation-toggle" style="width: 16px; height: 16px; cursor: pointer;">
+                        Apply Simulation to Table
+                    </label>
+                </div>
+                
+                <div class="inputs-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px; margin-bottom: 18px;">
+                    <div class="input-card">
+                        <div class="input-header">
+                            <label for="bsm-spot">Spot Price (<span id="spot-currency">INR</span>)</label>
+                            <input type="number" id="bsm-spot" step="0.01" value="0.00">
+                        </div>
+                        <input type="range" id="bsm-spot-slider" min="0" max="0" step="0.01" aria-label="Spot Price Slider" title="Spot Price Slider">
+                        <div class="range-labels">
+                            <span id="spot-min-lbl">--</span>
+                            <span id="spot-max-lbl">--</span>
+                        </div>
+                    </div>
+
+                    <div class="input-card">
+                        <div class="input-header">
+                            <label for="bsm-vol">Volatility (σ %)</label>
+                            <input type="number" id="bsm-vol" step="0.1" value="0.0">
+                        </div>
+                        <input type="range" id="bsm-vol-slider" min="1" max="100" step="0.1" value="15" aria-label="Volatility Slider" title="Volatility Slider">
+                        <div class="range-labels">
+                            <span>1.0%</span>
+                            <span>100.0%</span>
+                        </div>
+                    </div>
+
+                    <div class="input-card">
+                        <div class="input-header">
+                            <label for="bsm-days">Days to Expiry</label>
+                            <input type="number" id="bsm-days" step="1" value="30">
+                        </div>
+                        <input type="range" id="bsm-days-slider" min="1" max="365" step="1" value="30" aria-label="Days to Expiry Slider" title="Days to Expiry Slider">
+                        <div class="range-labels">
+                            <span>1 Day</span>
+                            <span>365 Days</span>
+                        </div>
+                    </div>
+
+                    <div class="input-card">
+                        <div class="input-header">
+                            <label for="bsm-rate">Risk-Free Rate (%)</label>
+                            <input type="number" id="bsm-rate" step="0.01" value="6.50">
+                        </div>
+                        <input type="range" id="bsm-rate-slider" min="0" max="15" step="0.05" value="6.5" aria-label="Risk-Free Rate Slider" title="Risk-Free Rate Slider">
+                        <div class="range-labels">
+                            <span>0.0%</span>
+                            <span>15.0%</span>
+                        </div>
+                    </div>
+
+                    <div class="input-card">
+                        <div class="input-header">
+                            <label for="bsm-div">Dividend Yield (%)</label>
+                            <input type="number" id="bsm-div" step="0.01" value="0.00">
+                        </div>
+                        <input type="range" id="bsm-div-slider" min="0" max="10" step="0.05" value="0" aria-label="Dividend Yield Slider" title="Dividend Yield Slider">
+                        <div class="range-labels">
+                            <span>0.0%</span>
+                            <span>10.0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 18px;">
+                    <button id="bsm-calculate-btn" style="padding: 8px 24px; background-color: var(--accent-indigo); color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.backgroundColor='var(--accent-orange)'" onmouseout="this.style.backgroundColor='var(--accent-indigo)'">Calculate</button>
+                </div>
+
+                <!-- ATM Outputs Summary -->
+                <div class="atm-summary-box">
+                    <div class="atm-title">At-The-Money (ATM) BSM Analytics</div>
+                    <div class="atm-metrics-grid">
+                        <div class="atm-metric-column">
+                            <div class="column-title calls-label">ATM Call Option</div>
+                            <div class="metric-row">
+                                <span class="lbl">BSM Price:</span>
+                                <span id="atm-call-price" class="val font-mono bold">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Delta (Δ):</span>
+                                <span id="atm-call-delta" class="val font-mono">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Theta (θ/day):</span>
+                                <span id="atm-call-theta" class="val font-mono">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Rho (ρ):</span>
+                                <span id="atm-call-rho" class="val font-mono">--</span>
+                            </div>
+                        </div>
+
+                        <div class="atm-metric-column center-column">
+                            <div class="column-title">Common Greeks</div>
+                            <div class="metric-row center-row">
+                                <span class="lbl">ATM Strike:</span>
+                                <span id="atm-strike-val" class="val font-mono bold highlight-text">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Gamma (Γ):</span>
+                                <span id="atm-gamma" class="val font-mono">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Vega (ν):</span>
+                                <span id="atm-vega" class="val font-mono">--</span>
+                            </div>
+                        </div>
+
+                        <div class="atm-metric-column">
+                            <div class="column-title puts-label">ATM Put Option</div>
+                            <div class="metric-row">
+                                <span class="lbl">BSM Price:</span>
+                                <span id="atm-put-price" class="val font-mono bold">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Delta (Δ):</span>
+                                <span id="atm-put-delta" class="val font-mono">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Theta (θ/day):</span>
+                                <span id="atm-put-theta" class="val font-mono">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="lbl">Rho (ρ):</span>
+                                <span id="atm-put-rho" class="val font-mono">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Script (with dynamic lazy-loading for heavy modules) -->
+    <script src="/app.js?v=2.7.0"></script>
+
+</body>
+</html>

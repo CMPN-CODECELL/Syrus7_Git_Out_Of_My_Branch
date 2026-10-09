@@ -1,0 +1,3 @@
+from shared.exceptions.domain import DomainException, EntityNotFoundException, BusinessRuleValidationException
+from shared.exceptions.api import APIException, BadRequestException, UnauthorizedException, NotFoundException
+from shared.exceptions.infrastructure import InfrastructureException, DatabaseConnectionException, ExternalServiceException

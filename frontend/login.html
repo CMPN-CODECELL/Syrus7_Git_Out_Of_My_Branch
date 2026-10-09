@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+    <div class="split-layout">
+        <!-- Left Panel: Authentication -->
+        <div class="auth-panel">
+            <div class="auth-content" style="max-width: 400px; text-align: center;">
+                <div class="header">
+                    <h1>Welcome Back</h1>
+                    <p style="margin-top: 10px; margin-bottom: 30px;">Sign in to access your personalized dashboard.</p>
+                </div>
+
+                <form id="emailLoginForm" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
+                    <div style="text-align: left;">
+                        <label for="emailInput" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: #374151;">Email</label>
+                        <input type="email" id="emailInput" required placeholder="you@example.com" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-family: inherit;">
+                    </div>
+                    <div style="text-align: left;">
+                        <label for="passwordInput" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: #374151;">Password</label>
+                        <input type="password" id="passwordInput" required placeholder="••••••••" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-family: inherit;">
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <button type="submit" class="primary-btn" style="flex: 1; justify-content: center;">Sign In</button>
+                        <button type="button" id="signUpBtn" class="primary-btn" style="flex: 1; justify-content: center; background-color: #1f2937; color: white;">Sign Up</button>
+                    </div>
+                </form>
+
+                <div style="display: flex; align-items: center; margin-bottom: 2rem;">
+                    <div style="flex: 1; height: 1px; background-color: #e5e7eb;"></div>
+                    <span style="padding: 0 1rem; color: #6b7280; font-size: 0.875rem;">Or continue with</span>
+                    <div style="flex: 1; height: 1px; background-color: #e5e7eb;"></div>
+                </div>
+
+                <div class="social-logins" style="margin-bottom: 2rem;">
+                    <!-- Expanded Google Button -->
+                    <button class="primary-btn" id="googleLoginBtn" style="justify-content: center;">
+                        <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google" />
+                        Google
+                    </button>
+                </div>
+
+                <p class="footer-text">
+                    Join the millions of smart investors who trust us to manage their finances. Log in to track your portfolio performance and make informed investment decisions.
+                </p>
+            </div>
+        </div>
+
+        <!-- Right Panel: Visual Showcase -->
+        <div class="visual-panel">
+            <div class="decoration dec-1"></div>
+            <div class="decoration dec-2"></div>
+            <div class="decoration dec-3"></div>
+            <div class="decoration dec-4"></div>
+            <!-- Original Image -->
+            <img src="bull_image.png" alt="3D Finance Bull" class="hero-image">
+        </div>
+    </div>
+    
+    <!-- Supabase Integration -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/supabaseClient.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            const supabase = await initSupabase();
+            if (!supabase) return;
+            
+            // Check if user is already logged in
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                window.location.href = '/dashboard.html';
+                return;
+            }
+
+            document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+                const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin + '/dashboard.html'
+                    }
+                });
+
+                if (error) {
+                    console.error(error);
+                    alert("Login failed: " + error.message);
+                }
+            });
+
+            document.getElementById('emailLoginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('emailInput').value;
+                const password = document.getElementById('passwordInput').value;
+                
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) {
+                    console.error(error);
+                    alert("Login failed: " + error.message);
+                } else {
+                    window.location.href = '/dashboard.html';
+                }
+            });
+
+            document.getElementById('signUpBtn').addEventListener('click', async () => {
+                const email = document.getElementById('emailInput').value;
+                const password = document.getElementById('passwordInput').value;
+                
+                if (!email || !password) {
+                    alert("Please enter both email and password to sign up.");
+                    return;
+                }
+
+                const { error } = await supabase.auth.signUp({
+                    email,
+                    password
+                });
+
+                if (error) {
+                    console.error(error);
+                    alert("Sign up failed: " + error.message);
+                } else {
+                    alert("Sign up successful! Please check your email to confirm your account (if email confirmation is enabled), or just sign in.");
+                }
+            });
+        });
+    </script>
+</body>
+</html>

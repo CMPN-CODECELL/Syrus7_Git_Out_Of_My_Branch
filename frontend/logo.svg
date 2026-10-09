@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+    <defs>
+        <!-- Gradients -->
+        <linearGradient id="deltaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ff7a00" />
+            <stop offset="60%" stop-color="#f37021" />
+            <stop offset="100%" stop-color="#e05300" />
+        </linearGradient>
+        
+        <linearGradient id="streamGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#06b6d4" />
+            <stop offset="50%" stop-color="#3b82f6" />
+            <stop offset="100%" stop-color="#6366f1" />
+        </linearGradient>
+
+        <linearGradient id="backGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#1e1b4b" />
+            <stop offset="100%" stop-color="#312e81" />
+        </linearGradient>
+
+        <!-- Drop Shadows for Glass/Premium effect -->
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.3" />
+        </filter>
+    </defs>
+
+    <!-- Main Group -->
+    <g filter="url(#shadow)">
+        <!-- Background Shield/Orb (Subtle) -->
+        <circle cx="100" cy="100" r="90" fill="url(#backGrad)" opacity="0.15" stroke="rgba(255,255,255,0.05)" stroke-width="2" />
+        
+        <!-- The Delta Symbol (Mathematical Δ) -->
+        <!-- Formed by a sleek, thick-stroke triangle with rounded corners -->
+        <path d="M 100,32 
+                 C 104,32 107,34 110,39 
+                 L 173,142 
+                 C 176,147 174,153 168,155 
+                 C 166,156 163,156 161,156 
+                 L 39,156 
+                 C 33,156 28,151 28,145 
+                 C 28,142 29,140 31,137 
+                 L 90,39 
+                 C 93,34 96,32 100,32 Z" 
+              fill="none" 
+              stroke="url(#deltaGrad)" 
+              stroke-width="16" 
+              stroke-linecap="round" 
+              stroke-linejoin="round" />
+
+        <!-- Inner Stream Wave 1 (Upper Wave) -->
+        <!-- Flowing through the delta, representing option pricing streams -->
+        <path d="M 25,120 
+                 C 55,90 75,130 105,100 
+                 C 135,70 155,115 185,85" 
+              fill="none" 
+              stroke="url(#streamGrad)" 
+              stroke-width="10" 
+              stroke-linecap="round" 
+              filter="url(#glow)" />
+
+        <!-- Inner Stream Wave 2 (Lower Wave, Offset) -->
+        <path d="M 15,135 
+                 C 45,105 70,145 100,115 
+                 C 130,85 150,130 180,100" 
+              fill="none" 
+              stroke="url(#streamGrad)" 
+              stroke-width="6" 
+              stroke-linecap="round" 
+              opacity="0.7" />
+
+        <!-- Data Nodes (Greeks Intersection Points) -->
+        <!-- Delta Node (Apex) -->
+        <circle cx="100" cy="32" r="6" fill="#ff7a00" filter="url(#glow)" />
+        
+        <!-- Stream Intersecting Nodes -->
+        <circle cx="102" cy="103" r="5" fill="#06b6d4" />
+        <circle cx="138" cy="91" r="4" fill="#3b82f6" />
+    </g>
+</svg>

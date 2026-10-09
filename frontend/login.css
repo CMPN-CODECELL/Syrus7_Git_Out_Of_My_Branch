@@ -1,0 +1,272 @@
+:root {
+    --text-dark: #0f172a;
+    --text-gray: #64748b;
+    --border-color: #e2e8f0;
+    
+    /* Premium Gold/Emerald mesh gradient matching the bull */
+    --premium-gradient: linear-gradient(135deg, #e3c792 0%, #fdf9ec 50%, #b89350 100%);
+    --button-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+    background-color: #ffffff;
+    color: var(--text-dark);
+    height: 100vh;
+    overflow: auto;
+    -webkit-font-smoothing: antialiased;
+}
+
+.split-layout {
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+}
+
+/* Left Panel (Auth) */
+.auth-panel {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Very subtle off-white gradient for depth */
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    padding: 2rem;
+    position: relative;
+    z-index: 2;
+    box-shadow: 20px 0 50px rgba(0,0,0,0.03);
+}
+
+.auth-content {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 2rem;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 24px;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+    /* Gradient Text */
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header p {
+    color: var(--text-gray);
+    font-size: 1.05rem;
+    line-height: 1.5;
+    font-weight: 400;
+}
+
+/* Primary Button (Google Login) */
+.primary-btn {
+    width: 100%;
+    background-color: #ffffff;
+    color: #334155;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 1.1rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.primary-btn img {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+}
+
+.primary-btn:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--button-shadow);
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+.primary-btn:hover img {
+    transform: scale(1.1);
+}
+
+.primary-btn:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Footer Text */
+.footer-text {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-top: 2.5rem;
+    padding: 0 1rem;
+}
+
+/* Right Panel (Visual Showcase) */
+.visual-panel {
+    flex: 1.2;
+    background: var(--premium-gradient);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Mesh Gradient Glowing Orbs */
+.visual-panel::before {
+    content: '';
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 50vw;
+    height: 50vw;
+    background: radial-gradient(circle, rgba(234, 179, 8, 0.6) 0%, rgba(234, 179, 8, 0) 70%);
+    border-radius: 50%;
+    filter: blur(60px);
+    animation: drift 15s ease-in-out infinite alternate;
+}
+
+.visual-panel::after {
+    content: '';
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 60vw;
+    height: 60vw;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0) 70%);
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: drift 20s ease-in-out infinite alternate-reverse;
+}
+
+/* 3D Hero Image */
+.hero-image {
+    max-width: 85%;
+    max-height: 85%;
+    object-fit: contain;
+    z-index: 10;
+    animation: float 6s ease-in-out infinite;
+    /* Soft glowing drop shadow for the 3D element */
+    filter: drop-shadow(0 30px 40px rgba(0,0,0,0.25)) drop-shadow(0 0 40px rgba(255,255,255,0.1));
+}
+
+/* Keyframes */
+@keyframes float {
+    0% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(1deg); }
+    100% { transform: translateY(0px) rotate(0deg); }
+}
+
+@keyframes drift {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(10%, 10%) scale(1.1); }
+}
+
+/* Floating Glassmorphism Decorations */
+.decoration {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 100px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 5;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+.dec-1 {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    top: 15%;
+    left: 15%;
+    animation: float-slow 8s infinite;
+}
+
+.dec-2 {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    bottom: 20%;
+    right: 15%;
+    animation: float-slow 10s infinite reverse;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dec-3 {
+    width: 15px;
+    height: 150px;
+    top: 30%;
+    right: 25%;
+    animation: float-slow 7s infinite;
+}
+
+.dec-4 {
+    width: 15px;
+    height: 60px;
+    bottom: 30%;
+    left: 20%;
+    animation: float-slow 9s infinite;
+}
+
+@keyframes float-slow {
+    0% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
+    50% { transform: translateY(-30px) rotate(5deg); opacity: 1; }
+    100% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
+}
+
+/* Responsive Design */
+@media (max-width: 960px) {
+    .split-layout {
+        flex-direction: column-reverse;
+    }
+    
+    .visual-panel {
+        flex: 0.7;
+        min-height: 350px;
+    }
+    
+    .auth-panel {
+        flex: 1;
+        border-radius: 30px 30px 0 0;
+        margin-top: -30px;
+    }
+
+    .auth-content {
+        box-shadow: none;
+        background: transparent;
+        border: none;
+        padding: 1rem;
+    }
+}

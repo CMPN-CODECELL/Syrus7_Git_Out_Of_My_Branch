@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Manual & Glossary - Shani</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #334155;
+            background-color: #f8fafc;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            border-bottom: 4px solid #f37021;
+            padding: 36px 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .header .logo-accent {
+            color: #f37021;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 15px;
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            margin: 30px auto 60px;
+            padding: 0 20px;
+        }
+
+        .back-nav {
+            margin-bottom: 25px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .back-btn:hover {
+            border-color: #3c3580;
+            color: #3c3580;
+            transform: translateX(-3px);
+        }
+
+        .intro-card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #f37021;
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .intro-card h2 {
+            font-size: 18px;
+            color: #0f172a;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .intro-p {
+            font-size: 14px;
+            color: #475569;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #1e1b4b;
+            margin: 40px 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+        }
+
+        .section-title svg {
+            color: #f37021;
+        }
+
+        .guide-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .guide-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .guide-card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s ease;
+        }
+
+        .guide-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(60, 53, 128, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+
+        .guide-card h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #3c3580;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .guide-card p {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.6;
+        }
+
+        .guide-card ul {
+            margin-left: 18px;
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+            color: #475569;
+        }
+
+        .term-box {
+            background: #f8fafc;
+            border-left: 3px solid #06b6d4;
+            padding: 10px 14px;
+            margin-top: 10px;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+        }
+
+        .term-box strong {
+            color: #0f172a;
+        }
+
+        .formula-badge {
+            background-color: #0f172a;
+            color: #38bdf8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 6px;
+        }
+
+        .label-teal {
+            background-color: rgba(13, 148, 136, 0.1);
+            color: #0d9488;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .label-orange {
+            background-color: rgba(234, 88, 12, 0.1);
+            color: #ea580c;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .label-green {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #059669;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .label-red {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #dc2626;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .table-custom {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+
+        .table-custom th, .table-custom td {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+        }
+
+        .table-custom th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: #64748b;
+            font-size: 12px;
+            border-top: 1px solid #cbd5e1;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1><span class="logo-accent">Shani</span> Platform Manual</h1>
+        <p>Comprehensive Glossary, Quantitative Models & Technical Indicators Handbook</p>
+    </header>
+
+    <main class="container">
+        <div class="back-nav">
+            <a href="/dashboard.html" class="back-btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Dashboard
+            </a>
+        </div>
+
+        <div class="intro-card">
+            <h2>User Handbook & Reference Guide</h2>
+            <p class="intro-p">This manual covers all terminology, valuation formulas, Black-Scholes-Merton (BSM) options models, Greek sensitivities, and technical analysis indicators used across the <strong>Shani Option Chain Analytics</strong> platform.</p>
+        </div>
+
+        <!-- SECTION 1: CORE OPTION CHAIN TERMS -->
+        <h2 class="section-title">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+            1. Option Chain & Market Terminology
+        </h2>
+
+        <div class="guide-grid">
+            <div class="guide-card">
+                <h3>Core Market Parameters</h3>
+                <ul>
+                    <li><strong>Spot Price (S):</strong> Live cash market price of underlying stock or index (e.g., NIFTY 50).</li>
+                    <li><strong>Strike Price (K):</strong> Specified price at which an option contract can be exercised.</li>
+                    <li><strong>Expiry Date:</strong> Official settlement date on which option contracts expire.</li>
+                    <li><strong>Call Option (CE):</strong> Financial contract granting buyer right (not obligation) to BUY underlying asset at strike price.</li>
+                    <li><strong>Put Option (PE):</strong> Financial contract granting buyer right (not obligation) to SELL underlying asset at strike price.</li>
+                    <li><strong>Last Traded Price (LTP):</strong> Most recent market execution price of option contract.</li>
+                </ul>
+            </div>
+
+            <div class="guide-card">
+                <h3>Moneyness & Order Book Terms</h3>
+                <ul>
+                    <li><strong>In-The-Money (ITM):</strong> Contract with intrinsic value. Calls with strike &lt; Spot, Puts with strike &gt; Spot. Highlighted in pale yellow in option chain.</li>
+                    <li><strong>At-The-Money (ATM):</strong> Strike price closest to current underlying spot price.</li>
+                    <li><strong>Out-of-The-Money (OTM):</strong> Contract with zero intrinsic value (time value only). Calls with strike &gt; Spot, Puts with strike &lt; Spot.</li>
+                    <li><strong>Bid Price / Qty:</strong> Highest price buyer willing to pay and quantity requested.</li>
+                    <li><strong>Ask Price / Qty:</strong> Lowest price seller willing to accept and quantity offered.</li>
+                    <li><strong>Volume:</strong> Total number of option contracts traded during current session.</li>
+                    <li><strong>Implied Volatility (IV):</strong> Annualized market volatility implied by current market price of option contract.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- SECTION 2: BLACK-SCHOLES-MERTON MODEL -->
+        <h2 class="section-title">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+            2. Black-Scholes-Merton (BSM) Pricing Engine
+        </h2>
+
+        <div class="guide-grid">
+            <div class="guide-card">
+                <h3>BSM Model Control Parameters</h3>
+                <p>BSM model calculates theoretical fair price for European options using key parameters:</p>
+                <ul>
+                    <li><strong>Volatility (&sigma; %):</strong> Annualized standard deviation of underlying asset returns.</li>
+                    <li><strong>Days to Expiry (T):</strong> Remaining time converted to annual fraction <code>T = Days / 365</code>.</li>
+                    <li><strong>Risk-Free Rate (r %):</strong> Prevailing annual risk-free interest rate (e.g. 6.50%).</li>
+                    <li><strong>Dividend Yield (q %):</strong> Continuous dividend yield of underlying asset.</li>
+                </ul>
+                <div class="term-box">
+                    <strong>BSM Call Formula:</strong> <code>C = S &middot; e<sup>-qT</sup> &middot; N(d₁) - K &middot; e<sup>-rT</sup> &middot; N(d₂)</code><br>
+                    <strong>BSM Put Formula:</strong> <code>P = K &middot; e<sup>-rT</sup> &middot; N(-d₂) - S &middot; e<sup>-qT</sup> &middot; N(-d₁)</code>
+                </div>
+            </div>
+
+            <div class="guide-card">
+                <h3>Theoretical Edge & Pricing Highlights</h3>
+                <p>Comparing market LTP with BSM theoretical price identifies mispriced options:</p>
+                <ul>
+                    <li><span class="label-teal">Underpriced (Teal Green):</span> Market LTP &lt; BSM Fair Price. Indicates theoretical underpricing (buying edge).</li>
+                    <li><span class="label-orange">Overpriced (Orange Red):</span> Market LTP &gt; BSM Fair Price. Indicates theoretical overpricing (selling edge).</li>
+                </ul>
+                <div class="term-box">
+                    <strong>Theoretical Edge:</strong> <code>Edge = LTP - BSM Price</code>. Negative edge indicates underpriced contract; positive edge indicates overpriced contract.
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: OPTION GREEKS -->
+        <h2 class="section-title">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+            3. Option Greeks & Sensitivity Metrics
+        </h2>
+
+        <div class="guide-card" style="margin-bottom: 20px;">
+            <h3>Greek Sensitivity Reference Table</h3>
+            <table class="table-custom">
+                <thead>
+                    <tr>
+                        <th>Greek</th>
+                        <th>Definition & Formula</th>
+                        <th>Call Range</th>
+                        <th>Put Range</th>
+                        <th>Trading Meaning</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Delta (&Delta;)</strong></td>
+                        <td><code>&part;V / &part;S</code> &mdash; Sensitivity to 1-unit underlying price change.</td>
+                        <td><span class="label-green">0.0 to +1.0</span></td>
+                        <td><span class="label-red">-1.0 to 0.0</span></td>
+                        <td>Equivalent stock share position & approximate ITM probability.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Gamma (&Gamma;)</strong></td>
+                        <td><code>&part;&sup2;V / &part;S&sup2;</code> &mdash; Rate of change of Delta per price move.</td>
+                        <td><span class="label-green">&gt; 0 (Peak ATM)</span></td>
+                        <td><span class="label-green">&gt; 0 (Peak ATM)</span></td>
+                        <td>Measures Delta acceleration. High near expiry for ATM options.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Vega (&nu;)</strong></td>
+                        <td><code>&part;V / &part;&sigma;</code> &mdash; Price sensitivity to 1% change in volatility.</td>
+                        <td><span class="label-green">&gt; 0</span></td>
+                        <td><span class="label-green">&gt; 0</span></td>
+                        <td>Exposure to implied volatility spikes (e.g. before earnings/events).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Theta (&theta;)</strong></td>
+                        <td><code>&part;V / &part;t</code> &mdash; Time decay loss per day.</td>
+                        <td><span class="label-red">&lt; 0 (Negative)</span></td>
+                        <td><span class="label-red">&lt; 0 (Negative)</span></td>
+                        <td>Daily option value erosion rate. Accelerates in final 30 days.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Rho (&rho;)</strong></td>
+                        <td><code>&part;V / &part;r</code> &mdash; Price sensitivity to 1% interest rate change.</td>
+                        <td><span class="label-green">&gt; 0</span></td>
+                        <td><span class="label-red">&lt; 0</span></td>
+                        <td>Impact of interest rate changes (more significant for LEAPs).</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="term-box" style="margin-top: 15px;">
+                <strong>BSM Model Intermediaries:</strong><br>
+                <code>d₁ = [ln(S/K) + (r - q + &sigma;&sup2;/2)T] / [&sigma;&radic;T]</code><br>
+                <code>d₂ = d₁ - &sigma;&radic;T</code><br>
+                <code>N(x):</code> Cumulative standard normal distribution function.
+            </div>
+        </div>
+
+        <!-- SECTION 4: TECHNICAL INDICATORS -->
+        <h2 class="section-title">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            4. Technical Indicators & Quantitative Signals
+        </h2>
+
+        <div class="guide-grid">
+            <div class="guide-card">
+                <h3>Composite Sentiment Score</h3>
+                <p>The Technical Analysis tab evaluates 7 core technical indicators (RSI, MACD, Bollinger Bands, SMA 20, SMA 50, EMA 20, EMA 50) and aggregates them into an overall market bias:</p>
+                <ul>
+                    <li><span class="label-green">STRONG BULLISH:</span> &ge; 5 indicators give Bullish signal.</li>
+                    <li><span class="label-green">BULLISH:</span> Bullish indicators outnumber Bearish.</li>
+                    <li><span class="label-teal">NEUTRAL:</span> Equal Bullish and Bearish count.</li>
+                    <li><span class="label-orange">BEARISH:</span> Bearish indicators outnumber Bullish.</li>
+                    <li><span class="label-red">STRONG BEARISH:</span> &ge; 5 indicators give Bearish signal.</li>
+                </ul>
+            </div>
+
+            <div class="guide-card">
+                <h3>Oscillators & Momentum</h3>
+                <ul>
+                    <li>
+                        <strong>RSI (Relative Strength Index - 14):</strong> Momentum oscillator measuring speed and magnitude of recent price moves on scale 0 to 100.
+                        <div class="formula-badge">RSI = 100 - [100 / (1 + AvgGain / AvgLoss)]</div>
+                        <ul style="margin-top:4px;">
+                            <td>&bull; <strong>&ge; 70 (Overbought):</strong> Bearish alert (asset may be overextended).</td>
+                            <td>&bull; <strong>&le; 30 (Oversold):</strong> Bullish alert (potential upward reversal).</td>
+                            <td>&bull; <strong>55 to 70:</strong> Bullish momentum.</td>
+                            <td>&bull; <strong>30 to 45:</strong> Bearish momentum.</td>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>MACD (12, 26, 9):</strong> Moving Average Convergence Divergence trend-following momentum metric.
+                        <div class="formula-badge">MACD Line = EMA(12) - EMA(26) | Signal = EMA9(MACD)</div>
+                        <ul style="margin-top:4px;">
+                            <td>&bull; <strong>Strong Bullish:</strong> MACD &gt; 0 and Histogram &gt; 0.</td>
+                            <td>&bull; <strong>Strong Bearish:</strong> MACD &lt; 0 and Histogram &lt; 0.</td>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="guide-card">
+                <h3>Moving Averages (SMA & EMA)</h3>
+                <p>Moving averages smooth price action to identify trend direction:</p>
+                <ul>
+                    <li>
+                        <strong>SMA 20 & SMA 50 (Simple Moving Average):</strong> Unweighted arithmetic mean of closing prices over 20 or 50 periods.
+                        <div class="formula-badge">SMA = (&sum; Prices) / N</div>
+                        <p style="margin-top:4px;">Signal is <strong>Bullish</strong> when Spot Price &ge; SMA, <strong>Bearish</strong> when Spot Price &lt; SMA.</p>
+                    </li>
+                    <li>
+                        <strong>EMA 20 & EMA 50 (Exponential Moving Average):</strong> Weighted moving average applying higher weight to recent prices.
+                        <div class="formula-badge">EMA = Price &middot; k + EMA_prev &middot; (1 - k), k = 2 / (N + 1)</div>
+                        <p style="margin-top:4px;">Signal is <strong>Bullish</strong> when Spot Price &ge; EMA, <strong>Bearish</strong> when Spot Price &lt; EMA.</p>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="guide-card">
+                <h3>Volatility & Pivot Support/Resistance</h3>
+                <ul>
+                    <li>
+                        <strong>Bollinger Bands (20, 2):</strong> Volatility bands placed 2 standard deviations above and below 20-period SMA.
+                        <div class="formula-badge">Bands = SMA20 &plusmn; (2 &middot; &sigma;)</div>
+                        <p style="margin-top:4px;">Spot &ge; Upper Band = Overbought (Bearish alert). Spot &le; Lower Band = Oversold (Bullish alert).</p>
+                    </li>
+                    <li>
+                        <strong>ATR (Average True Range - 14):</strong> Non-directional volatility metric calculating average absolute price range per period. High ATR = elevated volatility.
+                    </li>
+                    <li>
+                        <strong>Floor Pivot Points:</strong> Intraday support and resistance levels computed from prior High (H), Low (L), and Close (C):
+                        <div class="term-box">
+                            <strong>Pivot (P):</strong> <code>(H + L + C) / 3</code><br>
+                            <strong>Resistance R1:</strong> <code>2P - L</code> | <strong>R2:</strong> <code>P + (H - L)</code> | <strong>R3:</strong> <code>H + 2(P - L)</code><br>
+                            <strong>Support S1:</strong> <code>2P - H</code> | <strong>S2:</strong> <code>P - (H - L)</code> | <strong>S3:</strong> <code>L - 2(H - P)</code>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Shani Option Chain Analytics. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

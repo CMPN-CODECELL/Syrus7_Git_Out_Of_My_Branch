@@ -3,13 +3,422 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Trading Copilot</title>
-    <!-- Redirect to login.html or dashboard.html -->
-    <meta http-equiv="refresh" content="0; url=login.html" />
+    <!-- SEO Meta Tags -->
+    <title>Shani — Quant-Grade Options Analytics & Pricing Terminal</title>
+    <meta name="description" content="Shani is an event-driven modular monolith combining real-time NSE options chain calculations, client-side Black-Scholes Greeks calculators, Crank-Nicolson PDE pricing, and deep NLP market sentiment.">
+    <meta name="keywords" content="NSE Option Chain, Black-Scholes Calculator, Crank-Nicolson PDE, Quant Options Trading, Option Greeks, Indian Market Derivatives, FastAPI, Celery, Redis Streams">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/landing.css">
 </head>
 <body>
-    <script>
-        window.location.href = "login.html";
-    </script>
+    <!-- Live Streaming Particle Background -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Top Navigation Header -->
+    <header>
+        <div class="container nav-container">
+            <a href="/" class="logo-link" id="nav-logo">
+                <div class="logo-wrapper">
+                    <!-- Embedded SVG logo matching logo.svg -->
+                    <img src="/Shani-logo.svg" alt="Shani Logo" style="width: 100%; height: 100%;">
+                </div>
+                <div class="logo-text">Shani</div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="/" class="active" id="nav-home">Home</a></li>
+                <li><a href="/user_manual.html" id="nav-manual">User Manual</a></li>
+                <li><a href="/terms.html" id="nav-terms">Regulatory Center</a></li>
+                <li><a href="/login.html" class="btn-terminal" id="nav-launch">Login</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- Hero Area -->
+    <section class="hero-section" id="hero">
+        <div class="container hero-grid">
+            <div class="hero-content">
+                <div class="hero-tag">
+                    <span></span> Event-Driven Options Engine V2
+                </div>
+                <h1 class="hero-title">Real-Time Options Analytics <br>& <mark>Mathematical Solvers</mark></h1>
+                <p class="hero-desc">
+                    A high-performance modular monolith built for the Indian derivatives market. Combine live NSE option chains, client-side Black-Scholes Greeks, numerical Crank-Nicolson PDE solutions, and AI sentiment processing in a single system.
+                </p>
+                <div class="hero-actions">
+                    <a href="/login.html" class="btn-primary" id="hero-cta-btn">Login to Terminal</a>
+                    <a href="/user_manual.html" class="btn-secondary" id="hero-docs-btn">Explore Documentation</a>
+                </div>
+            </div>
+            
+            <div class="hero-visual">
+                <!-- Interactive BSM Calculator Widget inside a Mock Terminal -->
+                <div class="glass-card mock-terminal calculator-widget">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="terminal-dot dot-red"></span>
+                            <span class="terminal-dot dot-yellow"></span>
+                            <span class="terminal-dot dot-green"></span>
+                        </div>
+                        <div class="terminal-title">BSM calculator simulator</div>
+                    </div>
+                    
+                    <h4>Black-Scholes-Merton Engine</h4>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">Adjust parameters below to see analytical Greeks recalculate instantly in your browser.</p>
+                    
+                    <!-- Spot Price Slider -->
+                    <div class="slider-group">
+                        <label class="slider-label" for="calc-spot">
+                            <span>Underlying Spot (S)</span>
+                            <span>₹ <span id="calc-spot-val">19800</span></span>
+                        </label>
+                        <input type="range" min="18000" max="22000" value="19800" class="slider-input" id="calc-spot">
+                    </div>
+                    
+                    <!-- Strike Price Slider -->
+                    <div class="slider-group">
+                        <label class="slider-label" for="calc-strike">
+                            <span>Option Strike (K)</span>
+                            <span>₹ <span id="calc-strike-val">19800</span></span>
+                        </label>
+                        <input type="range" min="18000" max="22000" value="19800" class="slider-input" id="calc-strike">
+                    </div>
+                    
+                    <!-- Volatility Slider -->
+                    <div class="slider-group">
+                        <label class="slider-label" for="calc-vol">
+                            <span>Implied Volatility (IV)</span>
+                            <span><span id="calc-vol-val">14.5%</span></span>
+                        </label>
+                        <input type="range" min="5" max="50" step="0.5" value="14.5" class="slider-input" id="calc-vol">
+                    </div>
+                    
+                    <!-- Days to Expiry Slider -->
+                    <div class="slider-group">
+                        <label class="slider-label" for="calc-days">
+                            <span>Days to Expiry (T)</span>
+                            <span><span id="calc-days-val">7</span> days</span>
+                        </label>
+                        <input type="range" min="1" max="30" value="7" class="slider-input" id="calc-days">
+                    </div>
+
+                    <!-- Calculated Results -->
+                    <div class="results-grid">
+                        <div class="result-card">
+                            <div class="result-name">Call Price (C)</div>
+                            <div class="result-value call" id="res-call-price">--</div>
+                        </div>
+                        <div class="result-card">
+                            <div class="result-name">Put Price (P)</div>
+                            <div class="result-value put" id="res-put-price">--</div>
+                        </div>
+                        <div class="result-card">
+                            <div class="result-name">Call Delta (Δ)</div>
+                            <div class="result-value" id="res-call-delta">--</div>
+                        </div>
+                        <div class="result-card">
+                            <div class="result-name">Gamma (Γ)</div>
+                            <div class="result-value" id="res-gamma">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Overview Section -->
+    <section class="section" id="features">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">Features Grid</span>
+                <h2 class="section-title">Core Capability Stack</h2>
+                <p class="section-desc">Designed as a high-performance system combining industrial engineering and mathematical pricing structures.</p>
+            </div>
+            
+            <div class="features-grid">
+                <!-- Feature 1: High Density Option Chain -->
+                <div class="glass-card feature-card">
+                    <div class="feature-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                            <line x1="15" y1="3" x2="15" y2="21"></line>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="3" y1="15" x2="21" y2="15"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">NSE Options chain UI</h3>
+                    <p class="feature-desc">A production-grade interface that models the NSE India option chain grid, supporting sticky headers, custom ITM styling, and instant price updates.</p>
+                </div>
+
+                <!-- Feature 2: High Performance Solvers -->
+                <div class="glass-card feature-card">
+                    <div class="feature-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Dual pricing Solvers</h3>
+                    <p class="feature-desc">Analytical evaluations via the standard Black-Scholes-Merton model and numerical solutions using the discretized Crank-Nicolson PDE sparse matrix scheme.</p>
+                </div>
+
+                <!-- Feature 3: Modular Architecture -->
+                <div class="glass-card feature-card">
+                    <div class="feature-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Event-Driven Monolith</h3>
+                    <p class="feature-desc">Strict Hexagonal (Ports & Adapters) layers and Domain-Driven Design (DDD). Services communicate via durable Redis Streams event buses.</p>
+                </div>
+
+                <!-- Feature 4: Live WebSocket push -->
+                <div class="glass-card feature-card">
+                    <div class="feature-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                            <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                            <circle cx="12" cy="18" r="2"></circle>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Real-Time Streams</h3>
+                    <p class="feature-desc">An ASGI WebSocket hub broadcasting live pricing ticks, volatility adjustments, and sentiment signals directly to client sessions at low latency.</p>
+                </div>
+
+                <!-- Feature 5: Ingestion Failover -->
+                <div class="glass-card feature-card">
+                    <div class="feature-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Tiered Data Fallback</h3>
+                    <p class="feature-desc">Pluggable factory instantiating Groww API as primary, with automatic session-cached scraper failover on the NSE India official portal.</p>
+                </div>
+
+                <!-- Feature 6: Scalable Time-Series Storage -->
+                <div class="glass-card feature-card">
+                    <div class="feature-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">TimescaleDB Hypertable</h3>
+                    <p class="feature-desc">Optimized time-series database structure with automated 1-day chunking partitioning and a strict 7-day data retention policy.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Mathematical Solvers Showcase Section -->
+    <section class="section math-section" id="math">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">Mathematical Core</span>
+                <h2 class="section-title">Analytical vs. Numerical Solvers</h2>
+                <p class="section-desc">Shani combines closed-form formulas with finite-difference grids to analyze and cross-verify pricing models.</p>
+            </div>
+            
+            <div class="math-grid">
+                <!-- Black Scholes Merton -->
+                <div class="glass-card math-card">
+                    <div class="math-title-row">
+                        <h3>Black-Scholes-Merton Engine</h3>
+                        <span class="math-badge">Analytical</span>
+                    </div>
+                    <p class="section-desc">Evaluates theoretical option prices using cumulative standard normal distributions modified for continuous dividend yields.</p>
+                    <div class="math-formula">
+d1 = [ln(S/K) + (r - q + 0.5 * σ²) * T] / [σ * √T]
+d2 = d1 - σ * √T
+
+Call Price = S * e^(-q*T) * N(d1) - K * e^(-r*T) * N(d2)
+Put Price  = K * e^(-r*T) * N(-d2) - S * e^(-q*T) * N(-d1)
+                    </div>
+                    <ul class="math-list">
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Calculates full sensitivity Greeks (Delta, Gamma, Vega, Theta, Rho)
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Hastings approximation for cumulative standard normal density
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Supports real-time client-side calculation parameters sweeps
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Crank Nicolson PDE -->
+                <div class="glass-card math-card">
+                    <div class="math-title-row">
+                        <h3>Crank-Nicolson Solver</h3>
+                        <span class="math-badge">Numerical Grid</span>
+                    </div>
+                    <p class="section-desc">Solves the Black-Scholes partial differential equation over a discretized price-time grid, resolving boundaries backward in time.</p>
+                    <div class="math-formula">
+∂V/∂t + 0.5*σ²*S²*∂²V/∂S² + r*S*∂V/∂S - r*V = 0
+
+Tridiagonal Matrix Solver:
+- α_i * V_(i-1)^j + (1 + β_i) * V_i^j - γ_i * V_(i+1)^j = RHS^(j+1)
+                    </div>
+                    <ul class="math-list">
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            LU Decomposition pre-factorization using SciPy SuperLU
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Stability checks adjusting time step density dynamically
+                        </li>
+                        <li>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Resolves European option fair values on arbitrary grid steps
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Engineering Architecture Pipeline Diagram -->
+    <section class="section" id="pipeline">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-subtitle">System Flow</span>
+                <h2 class="section-title">Event-Driven Pipeline</h2>
+                <p class="section-desc">A modular data pipeline ensuring high availability and low-latency client delivery.</p>
+            </div>
+            
+            <div class="pipeline-container">
+                <div class="pipeline-flow">
+                    <!-- Node 1: Ingestion -->
+                    <div class="pipeline-node">
+                        <div class="pipeline-node-icon">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <h4 class="pipeline-node-title">Ingestion Layer</h4>
+                        <p class="pipeline-node-desc">Celery beat tasks query Groww API or NSE Web Scraper under cookie rotation rules.</p>
+                    </div>
+                    
+                    <!-- Arrow -->
+                    <div class="pipeline-arrow">&rarr;</div>
+
+                    <!-- Node 2: Redis Stream Event Bus -->
+                    <div class="pipeline-node">
+                        <div class="pipeline-node-icon">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+                        </div>
+                        <h4 class="pipeline-node-title">Redis Streams</h4>
+                        <p class="pipeline-node-desc">Durable, replayable consumer groups process raw option chains asynchronously.</p>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="pipeline-arrow">&rarr;</div>
+
+                    <!-- Node 3: Analytics Pricer Engine -->
+                    <div class="pipeline-node">
+                        <div class="pipeline-node-icon">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+                        </div>
+                        <h4 class="pipeline-node-title">Pricer Engine</h4>
+                        <p class="pipeline-node-desc">Executes BSM and Crank-Nicolson sparse solvers. Saves records to TimescaleDB.</p>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="pipeline-arrow">&rarr;</div>
+
+                    <!-- Node 4: Cache & Broadcaster -->
+                    <div class="pipeline-node">
+                        <div class="pipeline-node-icon">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+                        </div>
+                        <h4 class="pipeline-node-title">Broadcaster / API</h4>
+                        <p class="pipeline-node-desc">Updates Redis Cache read models. FastAPI routes REST calls and WebSocket ticks.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sentiment Meter Ingestion Stream Showcase -->
+    <section class="section sentiment-section" id="sentiment">
+        <div class="container sentiment-grid">
+            <div class="sentiment-meter-box">
+                <span class="section-subtitle">Real-Time Indicators</span>
+                <h3 class="section-title" style="margin-bottom: 24px;">Market NLP Sentiment</h3>
+                
+                <div class="meter-wrapper">
+                    <div class="meter-arc"></div>
+                    <div class="meter-needle" id="sentiment-needle"></div>
+                </div>
+                
+                <div class="sentiment-label" id="sentiment-label">Neutral</div>
+                <div class="sentiment-confidence" id="sentiment-confidence">Model Confidence: --%</div>
+            </div>
+            
+            <div class="sentiment-nlp-logs">
+                <h4 style="margin-bottom: 12px; font-weight: 700; color: var(--primary-orange);">NLP Stream Parser Ingestion</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+                    Below is the simulated news and options volume parser log. In the actual system, this feed parses finance headlines to derive sentiment vectors.
+                </p>
+                <div class="nlp-terminal" id="nlp-terminal">
+                    <div id="nlp-terminal-body">
+                        <!-- Generated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer CTA -->
+    <section class="cta-section">
+        <div class="cta-glow"></div>
+        <h2 class="cta-title">Ready to launch the Terminal?</h2>
+        <p class="cta-desc">
+            Experience our high-density option grid pricing sheet, customize BSM calculator overlays, and access quant metrics locally.
+        </p>
+        <a href="/login.html" class="btn-primary" style="font-size: 16px; padding: 14px 36px;" id="footer-cta-btn">Login to Terminal</a>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-grid">
+            <div class="footer-logo">
+                <div class="footer-logo-wrapper">
+                    <img src="/Shani-logo.svg" alt="Shani Logo" style="width: 100%; height: 100%;">
+                </div>
+                <div class="footer-logo-text">Shani</div>
+            </div>
+            
+            <ul class="footer-links">
+                <li><a href="/user_manual.html">User Manual</a></li>
+                <li><a href="/terms.html">Terms & Disclosures</a></li>
+                <li><a href="https://www.nseindia.com" target="_blank" rel="noopener">NSE India Portal</a></li>
+            </ul>
+            
+            <div>&copy; 2026 Shani. Provided for research and analytics purposes.</div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/supabaseClient.js"></script>
+    <script src="/landing.js"></script>
 </body>
 </html>

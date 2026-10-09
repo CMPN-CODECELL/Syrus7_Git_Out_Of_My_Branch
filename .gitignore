@@ -1,10 +1,70 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
-.env
-.venv/
+*.so
+.Python
 env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
 venv/
-node_modules/
+.venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 .DS_Store
+
+# Docker and Secrets
+.env
+.env.*
+!.env.example
+docker_data.vhdx
+
+# Excel & State Artifacts
+*.xlsx
+dump.rdb
+celerybeat-schedule
+
+# Downloaded ML Models (HuggingFace)
+model_cache/
+artifacts/models--*
+artifacts/.locks/
+
+# Persistence and State
+dump.rdb
+celerybeat-schedule
+
+# Legacy / Scratch
+functions.txt
+main.txt
+scratch/
+NSE-OCA.ini
+
+.agents
+
+# Gemini agent artifacts
+skills-lock.json
+
+# Research cache & raw daily Bhavcopy downloads
+research/data/raw/bhavcopy_cache/
+

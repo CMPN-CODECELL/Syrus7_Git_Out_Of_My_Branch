@@ -268,12 +268,14 @@ class ConnectionManager:
                 price_interval = float(settings.PricePollIntervalSeconds)
                 options_interval = float(settings.OptionsPollIntervalSeconds)
 
+                # .delay() is a blocking broker call (it retries for a minute when Redis is down), so it
+                # runs in a thread: on the event loop it would freeze every request, order approvals included.
                 for symbol in active_symbols:
                     # 1. Price Polling
                     last_price = last_price_poll.get(symbol, 0.0)
                     if now - last_price >= price_interval:
                         try:
-                            poll_prices.delay(symbol)
+                            await asyncio.to_thread(poll_prices.delay, symbol)
                             logger.info("Dispatched live price poll task for %s", symbol)
                         except Exception as exc:
                             logger.error("Failed to dispatch price poll for %s: %s", symbol, exc)
@@ -283,7 +285,7 @@ class ConnectionManager:
                     last_opts = last_options_poll.get(symbol, 0.0)
                     if now - last_opts >= options_interval:
                         try:
-                            fetch_and_publish_options.delay(symbol)
+                            await asyncio.to_thread(fetch_and_publish_options.delay, symbol)
                             logger.info("Dispatched live options poll task for %s", symbol)
                         except Exception as exc:
                             logger.error("Failed to dispatch options poll for %s: %s", symbol, exc)

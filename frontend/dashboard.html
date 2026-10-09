@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Shani Options quantitative analytics and real-time options Greeks terminal for Indian equity derivatives (NSE/BSE).">
-    <title>Shani — Options Ingestion & Greeks Terminal</title>
+    <meta name="description" content="Kraken: an AI trading copilot for the 021 Trade sandbox, with option-chain and technical analysis.">
+    <title>Kraken — AI Trading Copilot</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css?v=2.7.0">
+    <link rel="stylesheet" href="/copilot.css?v=1.0.0">
+    <link rel="icon" href="/kraken-logo.svg" type="image/svg+xml">
 </head>
 <body class="light-theme" style="opacity: 0; transition: opacity 0.3s ease;">
     <!-- Background Particle Canvas -->
@@ -20,11 +22,12 @@
         <div class="nse-container" style="max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 32px;">
                 <a href="/" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
-                    <img src="/Shani-logo.svg" alt="Shani Logo" style="width: 34px; height: 34px; flex-shrink: 0;">
-                    <span class="logo-brand-text">Shani</span>
+                    <img src="/kraken-logo.svg" alt="Kraken logo" style="width: 34px; height: 34px; flex-shrink: 0;">
+                    <span class="logo-brand-text">Kraken</span>
                 </a>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <a href="/" class="dash-nav-link">Home</a>
+                    <a href="#" id="tab-copilot" class="dash-nav-link">Copilot</a>
                     <a href="#" id="tab-option-chain" class="dash-nav-link active">Option Chain</a>
                     <a href="#" id="tab-technicals" class="dash-nav-link">Technicals</a>
                 </div>
@@ -145,8 +148,8 @@
                     </svg>
                     Download (.xlsx)
                 </button>
-                <span class="divider">|</span>
-                <button id="open-research-export-btn" class="nse-csv-btn" style="background-color: #2563eb; border-color: #2563eb; color: white;" title="Download Multi-Day Research Excel">
+                <!-- Multi-day export is hidden: its backend route (/v1/export/research-eod) was removed (docs/API.md). -->
+                <button id="open-research-export-btn" class="nse-csv-btn" style="display: none; background-color: #2563eb; border-color: #2563eb; color: white;" title="Download Multi-Day Research Excel">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -201,6 +204,50 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Kraken Copilot (chat, order cards, order journal): frontend/copilot.js -->
+    <div id="copilot-view-container" class="copilot-container" style="display: none;">
+        <div class="kc-header">
+            <div>
+                <h1>Kraken Copilot</h1>
+                <p>Ask about your 021 portfolio and the market. Kraken can prepare an order card, but only your click on Approve sends it.</p>
+            </div>
+            <div id="kc-status" class="kc-status" aria-live="polite"></div>
+        </div>
+        <div id="kc-orders-notice" class="kc-orders-notice" hidden></div>
+        <div class="kc-layout">
+            <section class="kc-panel">
+                <div class="kc-panel-head">
+                    <span>Chat</span>
+                    <button type="button" id="kc-clear" class="kc-link-btn">Clear conversation</button>
+                </div>
+                <div id="kc-log" class="kc-log" aria-live="polite">
+                    <div id="kc-empty" class="kc-empty">Ask about your P&amp;L, positions, average prices, quotes, option chains or technicals. Ask Kraken to buy, sell, modify or cancel and it prepares a card for you to approve.</div>
+                </div>
+                <div id="kc-suggestions" class="kc-suggestions"></div>
+                <form id="kc-form" class="kc-form">
+                    <textarea id="kc-input" rows="1" maxlength="1000" placeholder="e.g. Which positions are down more than 5%?" aria-label="Message Kraken"></textarea>
+                    <button type="submit" id="kc-send" class="kc-send">Send</button>
+                </form>
+                <div class="kc-disclaimer">Prices and orders come from the 021 sandbox. Analysis is informational, not investment advice.</div>
+            </section>
+            <section class="kc-panel">
+                <div class="kc-panel-head">
+                    <span>Orders</span>
+                    <button type="button" id="kc-orders-refresh" class="kc-link-btn">Refresh</button>
+                </div>
+                <div class="kc-table-wrap">
+                    <table class="kc-table kc-orders-table">
+                        <thead>
+                            <tr><th>Sent</th><th>Order</th><th>Type</th><th>Kraken state</th><th>021 status</th><th>Order #</th><th>Filled</th><th>Reason</th></tr>
+                        </thead>
+                        <tbody id="kc-orders-body"></tbody>
+                    </table>
+                </div>
+                <div id="kc-orders-empty" class="kc-orders-empty">No orders yet. Approved cards appear here with live status from 021.</div>
+            </section>
         </div>
     </div>
 
@@ -318,12 +365,12 @@
         </div>
     </div>
 
-    <!-- Premium Shani Brand Footer -->
+    <!-- Kraken Brand Footer -->
     <footer class="nse-footer">
         <div class="nse-container footer-grid">
             <div class="footer-brand-section">
                 <div class="footer-logo">
-                    <span class="logo-accent">Shani</span>
+                    <span class="logo-accent">Kraken</span>
                 </div>
                 <p class="footer-desc">Professional-grade derivatives analytics and real-time options chain valuation using advanced Black-Scholes-Merton models.</p>
                 <div class="footer-socials">
@@ -352,7 +399,7 @@
         
         <div class="footer-bottom-bar">
             <div class="nse-container bottom-bar-content">
-                <p class="footer-copyright">&copy; 2026 Shani Option Chain Analytics. All rights reserved.</p>
+                <p class="footer-copyright">&copy; 2026 Kraken. All rights reserved.</p>
                 <div class="footer-bottom-meta">
                     <span class="footer-best-view">Best viewed in modern web browsers</span>
                     <span class="footer-divider">|</span>
@@ -521,7 +568,7 @@
     <div id="info-modal" class="modal">
         <div class="modal-content info-modal-content">
             <div class="modal-header info-modal-header">
-                <h2>Shani Information & Regulatory Center</h2>
+                <h2>Kraken Information & Regulatory Center</h2>
                 <span class="close-btn" id="info-modal-close">&times;</span>
             </div>
             <div class="info-modal-tabs">
@@ -533,7 +580,7 @@
                 <!-- User Manual Tab -->
                 <div id="user-manual" class="info-tab-content active">
                     <h3 class="info-section-title">Website User Guide</h3>
-                    <p class="info-p">Welcome to <strong>Shani Option Chain Analytics</strong>. This dashboard replicates the official National Stock Exchange of India (NSE) equity derivatives option chain layout, enhanced with real-time derivative valuations, theoretical Black-Scholes-Merton (BSM) prices, and real-time Greek computations.</p>
+                    <p class="info-p">Welcome to <strong>Kraken</strong>. This dashboard replicates the official National Stock Exchange of India (NSE) equity derivatives option chain layout, enhanced with real-time derivative valuations, theoretical Black-Scholes-Merton (BSM) prices, and real-time Greek computations.</p>
                     
                     <div class="guide-grid">
                         <div class="guide-card">
@@ -601,16 +648,16 @@
                         <p>All Black-Scholes-Merton (BSM) prices, Greeks (Delta, Gamma, Vega, Theta, Rho), and implied volatility calculations rendered on this website are simulated mathematical approximations. They are for educational, research, and analytical purposes only. They do not constitute actual exchange trading advice, quotes, or transactional execution services.</p>
 
                         <h4>2. No Financial Advice or Recommendations</h4>
-                        <p>Shani is not a registered SEBI Investment Adviser (IA) or Research Analyst (RA). No calculations, outputs, search indexes, or pricing sheets on this website constitute investment, legal, tax, or trading advice, or a recommendation to buy, sell, or write any stock, derivative, or option contract. Users are entirely responsible for their own investment and trading decisions.</p>
+                        <p>Kraken is not a registered SEBI Investment Adviser (IA) or Research Analyst (RA). No calculations, outputs, search indexes, or pricing sheets on this website constitute investment, legal, tax, or trading advice, or a recommendation to buy, sell, or write any stock, derivative, or option contract. Users are entirely responsible for their own investment and trading decisions.</p>
 
                         <h4>3. Exchange Data Source Limitation</h4>
-                        <p>Market data (LTP, OI, Volume, bid/ask spreads) displayed on this platform is processed through an automated ingestion catalog. While we strive to maintain high-quality tracking, data may be subject to ingestion latencies, inaccuracies, or standard transmission errors. Shani makes no warranties regarding the accuracy, completeness, or timeliness of data. For live execution, cross-reference data directly with official platforms of the National Stock Exchange of India (NSE India).</p>
+                        <p>Market data (LTP, OI, Volume, bid/ask spreads) displayed on this platform is processed through an automated ingestion catalog. While we strive to maintain high-quality tracking, data may be subject to ingestion latencies, inaccuracies, or standard transmission errors. Kraken makes no warranties regarding the accuracy, completeness, or timeliness of data. For live execution, cross-reference data directly with official platforms of the National Stock Exchange of India (NSE India).</p>
 
                         <h4>4. Assumption of Valuation Risks</h4>
                         <p>Derivative pricing models make mathematical assumptions (e.g., constant volatility, log-normal distributions, constant interest rates) that frequently deviate from real-world market dynamics. Financial markets are subject to extreme tail risks, high volatility, bid-ask slippages, and liquidity dry-outs. Users who leverage these models assume all associated financial risks.</p>
 
                         <h4>5. Intellectual Property</h4>
-                        <p>NSE, NIFTY, and related stock symbols are trademarks of the National Stock Exchange of India Limited and/or its affiliates. Shani is an independent analytical application and is not affiliated, endorsed, or partnered with NSE India.</p>
+                        <p>NSE, NIFTY, and related stock symbols are trademarks of the National Stock Exchange of India Limited and/or its affiliates. Kraken is an independent analytical application and is not affiliated, endorsed, or partnered with NSE India.</p>
                     </div>
                 </div>
 
@@ -1263,7 +1310,9 @@
     </div>
 
     <!-- Main Application Script (with dynamic lazy-loading for heavy modules) -->
-    <script src="/app.js?v=2.7.0"></script>
+    <script src="/kraken-api.js?v=1.0.0"></script>
+    <script src="/app.js?v=2.7.1"></script>
+    <script src="/copilot.js?v=1.0.0"></script>
 
 </body>
 </html>

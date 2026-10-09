@@ -1,5 +1,7 @@
 # Kraken API for the chat UI
 
+The reference client is the dashboard's Copilot tab ([frontend/copilot.js](../frontend/copilot.js)), which follows every rule below.
+
 All endpoints need a Supabase access token: `Authorization: Bearer <supabase access_token>`. A missing, expired or forged token returns `401`. Keep the token in JavaScript storage and send it as a header; **never put it in a cookie**. Kraken uses no CSRF token, and that is only safe while auth stays header-based (ADR-011).
 
 ## POST /v1/chat
@@ -97,7 +99,7 @@ This is the only call that sends an order to 021.
 |---|---|---|---|
 | 200 | `sent` | 021 accepted it; `order.order_id` is set | Show "Sent", then follow live updates |
 | 200 | `rejected` | 021's risk checks rejected it; `order.reason` says why | Show the reason |
-| 200 | `not_sent` | It never reached 021 (connection or session); `message` says why | Offer to ask for a fresh card |
+| 200 | `not_sent` | 021 never processed it (connection, or the session was replaced by another login); `message` says why. `new_proposal` usually holds a fresh card | Show `new_proposal` as a new card (or ask for one) |
 | 200 | `unknown` | Sent, but 021 didn't confirm; Kraken is checking the order book and will **not** resend | Show "Checking…" until the live update resolves it |
 | 409 | `requote` | The price moved more than 0.5%; nothing sent; `new_proposal` holds a fresh card | Replace the card with `new_proposal` |
 | 409 | `refused` | Already approved/rejected, hash mismatch, or a pre-send check failed (holding changed, stale instruments, no fresh price, order no longer open) | Show `message` |

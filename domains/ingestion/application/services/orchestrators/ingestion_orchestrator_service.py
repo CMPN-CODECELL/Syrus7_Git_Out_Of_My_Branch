@@ -70,9 +70,9 @@ async def _handle_refresh(stream_bus: DurableEventStream, message: StreamMessage
         from domains.ingestion.tasks.ingestion_tasks import poll_prices, poll_options
         from domains.ingestion.tasks.market_tasks import fetch_and_publish_options
         
-        poll_prices.delay(symbol)
-        poll_options.delay(symbol)
-        fetch_and_publish_options.delay(symbol)
+        # .delay() blocks on the broker; keep it off the event loop.
+        for task in (poll_prices, poll_options, fetch_and_publish_options):
+            await asyncio.to_thread(task.delay, symbol)
 
         logger.info("[%s] Dispatched ingestion tasks", symbol)
         await stream_bus.ack(Streams.ANALYSIS_REFRESH_REQUESTED, _GROUP, message.message_id)

@@ -50,7 +50,7 @@ The exit test `test_l2_exit.py` passes.
 Not done in Phase 2:
 - no funds endpoint exists in the 021 API, so there is no margin check (021's own rejection is shown);
 - modifying a partially filled order is refused;
-- the UI cards and screens are the UI team's work (contract in [API.md](API.md#orders)).
+- the UI has no automated tests (it was checked by hand against the fake 021). The copilot panel itself is built: chat, cards, journal and live updates, in [frontend/copilot.js](../frontend/copilot.js), using the contract in [API.md](API.md#orders). Visual design and branding stay with the UI team.
 
 ## Phase 3: standing instructions
 

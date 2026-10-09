@@ -1,4 +1,4 @@
-/* --- Shani Premium Landing Page Script --- */
+/* --- Kraken landing page script (legacy) --- */
 document.addEventListener("DOMContentLoaded", () => {
     // 1. Particle Canvas Streaming Background
     initCanvasBackground();

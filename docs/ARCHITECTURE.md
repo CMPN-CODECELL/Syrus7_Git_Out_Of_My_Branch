@@ -20,7 +20,7 @@ See [DECISIONS.md](DECISIONS.md), ADR-001 and ADR-003.
 
 ```mermaid
 flowchart LR
-  Trader((Trader)) -->|browser| UI["Web chat UI<br/>(frontend/, owned by UI team)"]
+  Trader((Trader)) -->|browser| UI["Web UI: dashboard + Copilot tab<br/>(frontend/copilot.js)"]
   UI -->|"Supabase login"| SB[(Supabase Auth)]
   UI -->|"HTTPS + Bearer JWT"| API["Kraken API<br/>FastAPI, 1 uvicorn worker"]
   API -->|"function calling"| GEM["Gemini<br/>(google-genai)"]

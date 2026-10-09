@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Sign in · Kraken</title>
+    <link rel="icon" href="/kraken-logo.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -16,9 +17,11 @@
         <div class="auth-panel">
             <div class="auth-content" style="max-width: 400px; text-align: center;">
                 <div class="header">
-                    <h1>Welcome Back</h1>
-                    <p style="margin-top: 10px; margin-bottom: 30px;">Sign in to access your personalized dashboard.</p>
+                    <img src="/kraken-logo.svg" alt="Kraken" style="width: 48px; height: 48px; margin-bottom: 12px;">
+                    <h1>Welcome to Kraken</h1>
+                    <p style="margin-top: 10px; margin-bottom: 30px;">Sign in to your AI trading copilot.</p>
                 </div>
+                <div id="authNotice" role="alert" hidden style="margin-bottom: 1rem; padding: 0.75rem; border-radius: 0.375rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: 0.875rem; text-align: left;"></div>
 
                 <form id="emailLoginForm" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
                     <div style="text-align: left;">
@@ -70,9 +73,28 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/supabaseClient.js"></script>
     <script>
+        // "Failed to fetch" means the browser could not reach Supabase at all (wrong or deleted
+        // project URL, network, blocked by an extension), not a wrong password.
+        function authErrorText(action, error) {
+            const msg = (error && error.message) || String(error);
+            if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+                return `${action} failed: can't reach the sign-in service (Supabase). Check that supabaseUrl in .env is your project's URL (Supabase dashboard → Project Settings → API), then restart the app.`;
+            }
+            return `${action} failed: ${msg}`;
+        }
+
+        function showNotice(text) {
+            const box = document.getElementById('authNotice');
+            box.textContent = text;
+            box.hidden = false;
+        }
+
         document.addEventListener("DOMContentLoaded", async () => {
             const supabase = await initSupabase();
-            if (!supabase) return;
+            if (!supabase) {
+                showNotice("Sign-in is not configured: the server returned no Supabase URL or key. Set supabaseUrl and supabaseKey in .env and restart the app.");
+                return;
+            }
             
             // Check if user is already logged in
             const { data: { session } } = await supabase.auth.getSession();
@@ -91,7 +113,7 @@
 
                 if (error) {
                     console.error(error);
-                    alert("Login failed: " + error.message);
+                    showNotice(authErrorText("Google sign-in", error));
                 }
             });
 
@@ -107,7 +129,7 @@
 
                 if (error) {
                     console.error(error);
-                    alert("Login failed: " + error.message);
+                    showNotice(authErrorText("Sign in", error));
                 } else {
                     window.location.href = '/dashboard.html';
                 }
@@ -118,20 +140,22 @@
                 const password = document.getElementById('passwordInput').value;
                 
                 if (!email || !password) {
-                    alert("Please enter both email and password to sign up.");
+                    showNotice("Enter both email and password to sign up.");
                     return;
                 }
 
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password
                 });
 
                 if (error) {
                     console.error(error);
-                    alert("Sign up failed: " + error.message);
+                    showNotice(authErrorText("Sign up", error));
+                } else if (data && data.session) {
+                    window.location.href = '/dashboard.html';   // email confirmation is off: signed in already
                 } else {
-                    alert("Sign up successful! Please check your email to confirm your account (if email confirmation is enabled), or just sign in.");
+                    alert("Account created. Check your email for the confirmation link, then sign in.");
                 }
             });
         });

@@ -2,6 +2,7 @@
 Gemini adapter (google-genai SDK). Manual function calling only: automatic function calling is
 disabled so every tool call passes through Kraken's argument validation and audit.
 """
+import asyncio
 import logging
 from typing import Any, Optional
 
@@ -9,22 +10,49 @@ from domains.copilot.ports import FunctionCall, LLMTurn, LLMUnavailableError
 
 logger = logging.getLogger(__name__)
 
+RETRYABLE_CODES = {500, 503}   # Gemini overloaded/internal: one quick retry (an LLM call has no side effects)
+RETRY_DELAY_SECONDS = 1.5
+
+
+def unavailable_message(code: Optional[int]) -> str:
+    """What the trader sees when Gemini fails, by HTTP code (google.genai errors carry `.code`)."""
+    if code == 429:
+        return "The AI hit its Gemini request limit. Wait about a minute and try again."
+    if code in (401, 403):
+        return "The AI key was rejected by Gemini. Check GEMINI_API_KEY on the server."
+    if code == 404:
+        return "The configured Gemini model was not found. Check GEMINI_MODEL on the server."
+    if code is not None and code >= 500:
+        return "Gemini is having trouble right now. Try again in a moment."
+    return "The language model is unavailable right now."
+
 
 class GeminiConversation:
-    def __init__(self, client: Any, model: str, config: Any, contents: list):
+    def __init__(self, client: Any, model: str, config: Any, contents: list, *, sleep=asyncio.sleep):
         self._client = client
         self._model = model
         self._config = config
         self._contents = contents
+        self._sleep = sleep
+
+    async def _call(self):
+        return await self._client.aio.models.generate_content(model=self._model, contents=self._contents, config=self._config)
 
     async def _generate(self) -> LLMTurn:
         try:
-            response = await self._client.aio.models.generate_content(
-                model=self._model, contents=self._contents, config=self._config
-            )
+            try:
+                response = await self._call()
+            except Exception as exc:
+                if getattr(exc, "code", None) not in RETRYABLE_CODES:
+                    raise
+                logger.info("Gemini returned %s; retrying once", getattr(exc, "code", None))
+                await self._sleep(RETRY_DELAY_SECONDS)
+                response = await self._call()
         except Exception as exc:
-            logger.warning("Gemini call failed: %s", type(exc).__name__)
-            raise LLMUnavailableError("The language model is unavailable right now.", cause=exc) from exc
+            code = getattr(exc, "code", None)
+            logger.warning("Gemini call failed: %s code=%s status=%s message=%s", type(exc).__name__, code,
+                           getattr(exc, "status", None), str(getattr(exc, "message", "") or "")[:200])
+            raise LLMUnavailableError(unavailable_message(code if isinstance(code, int) else None), cause=exc) from exc
 
         candidate = (response.candidates or [None])[0]
         if candidate is None or candidate.content is None:

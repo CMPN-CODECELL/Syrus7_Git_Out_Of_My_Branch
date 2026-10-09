@@ -1540,7 +1540,7 @@ async function downloadCSV() {
     const sumYield   = simActive ? appState.dividendYield   : (appState.marketYield || 0.0);
 
     const summaryAoA = [
-        ["Shani — Export Summary"],
+        ["Kraken — Export Summary"],
         [],
         ["Export Date", exportDate],
         ["Export Time", exportTime],
@@ -1711,7 +1711,7 @@ async function downloadCSV() {
     const now = new Date();
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const formattedDate = `${months[now.getMonth()]} ${String(now.getDate()).padStart(2, '0')} ${now.getFullYear()}`;
-    XLSX.writeFile(wb, `Shani_${appState.symbol}_${appState.selectedExpiry} - ${formattedDate}.xlsx`);
+    XLSX.writeFile(wb, `Kraken_${appState.symbol}_${appState.selectedExpiry} - ${formattedDate}.xlsx`);
 }
 
 // ----------------------------------------------------
@@ -2575,16 +2575,16 @@ function setupAlertsModal() {
             }
 
             try {
-                const res = await fetch("/v1/notifications/alerts", {
+                // Alert routes need the Supabase Bearer token (KrakenAPI adds it).
+                const res = await KrakenAPI.request("/v1/notifications/alerts", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
+                    body: {
                         symbol: symbol,
                         condition_type: condition,
                         threshold: threshold,
                         cooldown_seconds: cooldown,
                         channels: ["WEBSOCKET"]
-                    })
+                    }
                 });
                 if (res.ok) {
                     loadActiveAlertRules();
@@ -2603,7 +2603,7 @@ async function loadActiveAlertRules() {
     const listEl = document.getElementById("active-alerts-list");
     if (!listEl) return;
     try {
-        const res = await fetch("/v1/notifications/alerts");
+        const res = await KrakenAPI.request("/v1/notifications/alerts");
         if (res.ok) {
             const rules = await res.json();
             if (rules.length === 0) {
@@ -2626,7 +2626,7 @@ async function loadActiveAlertRules() {
 
 window.deleteAlertRule = async function(ruleId) {
     try {
-        const res = await fetch(`/v1/notifications/alerts/${ruleId}`, { method: "DELETE" });
+        const res = await KrakenAPI.request(`/v1/notifications/alerts/${encodeURIComponent(ruleId)}`, { method: "DELETE" });
         if (res.ok) {
             loadActiveAlertRules();
         }
@@ -2754,7 +2754,7 @@ function initResearchExportModal() {
                 const downloadUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = downloadUrl;
-                a.download = `AlphaStreams_${sym}_${startDt}_to_${endDt}.xlsx`;
+                a.download = `Kraken_${sym}_${startDt}_to_${endDt}.xlsx`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();

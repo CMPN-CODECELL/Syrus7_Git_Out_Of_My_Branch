@@ -192,7 +192,7 @@ class TradeRestClient:
             new_token = await self.tokens.refresh_after_401(token)
             if is_order_action:
                 raise BrokerAuthError(
-                    "The 021 session had expired and was renewed; the order was NOT sent. Please approve it again.",
+                    "The 021 session had been replaced (another login with this UCC) and was renewed; the order was NOT sent.",
                     status=401,
                     path=path,
                 )

@@ -60,6 +60,14 @@ To view logs:
 docker compose logs -f app
 ```
 
+## Using the app
+
+1. Open http://127.0.0.1:8000/login.html. Use exactly an origin listed in `ALLOWED_ORIGINS`: approvals and the live order stream check it.
+2. Sign in with Supabase (email/password or Google; the Supabase project must have that provider enabled).
+3. The dashboard opens on the **Copilot** tab. `/dashboard.html#option-chain` opens the option chain instead.
+
+The pills at the top come from `GET /v1/copilot/status`; hover over a pill for details. **Live orders** is green while `WS /v1/stream/orders` is connected. When it's amber, the journal is polled every 10 s instead.
+
 ## Health checks
 
 - `GET /health`: Redis and DB connectivity (no login needed).
@@ -112,6 +120,8 @@ It logs in, counts positions, holdings and orders, downloads and decodes instrum
 | `silent_subscriptions > 0` | Unknown token, wrong exchange code, or an invalid `oc` filter | Check the instrument with `get_quote`; refresh instruments |
 | Answers say prices are stale | Socket down, or quiet for over 30 s | Check `market_socket_connected` and `last_error`; outside market hours only the last snapshot exists |
 | "not enough data for RSI(14)" / symbols skipped in screens | No stored daily history yet (new listing, unmapped symbol, backfill not run, yfinance down) | Wait for the backfill (08:45 IST, or right after a symbol first appears); check Celery logs |
+| Chat replies "The AI hit its Gemini request limit" | Gemini 429. The free tier allows about 10 requests a minute, and each chat message uses 2 or more | Wait a minute; use a paid key or a model with a higher limit (`GEMINI_MODEL`) for demos. Logs show `Gemini call failed: ... code=429` |
+| Approve says "session had been replaced … NOT sent" and logs show `021 login ok` about every minute | Something else logs in with the same UCC (a teammate's Kraken, `smoke_021.py`, another instance), and each login revokes the other | Run exactly one process per UCC; give each teammate their own 021 account. Nothing was sent; approve the fresh card |
 | Chat replies "The language model is unavailable right now." | Gemini key missing or invalid, quota exhausted, or network | Check `GEMINI_API_KEY` and the Google AI Studio quota |
 | 401 on `/v1/chat` | Missing or expired Supabase token, wrong `SUPABASE_JWT_SECRET`, or audience mismatch | Log in again; check the secret/JWKS and `SUPABASE_JWT_AUDIENCE` |
 | Redis `NOAUTH` / container restarts | `REDIS_PASSWORD` missing, or `REDIS_URL` without the password | Set both (see the table above) |
@@ -123,6 +133,11 @@ It logs in, counts positions, holdings and orders, downloads and decodes instrum
 | Journal row `AMBIGUOUS` | Several identical 021 orders could match the send (e.g. one placed manually in the 021 app) | Check the order book in the 021 app; Kraken won't resolve or resend it |
 | Journal row `NOT_PLACED` but the order later shows in 021 | 021 booked it very late | The tracker links it when its event arrives and the trader is told (`order_late_link` in the audit log) |
 | Orders refused: "instrument list is out of date" | Today's instruments file hasn't been downloaded | Check `instruments_fresh` and `last_error` |
+| Login page: "can't reach the sign-in service (Supabase)" (formerly "Failed to fetch") | The browser can't reach `supabaseUrl`: wrong project ref, project deleted (the name stops resolving in DNS), or paused | Copy the Project URL and the anon/publishable key from Supabase → Project Settings → API into `.env`, then `docker compose up -d` |
+| Dashboard keeps sending you back to the login page | No Supabase session, or `/config` returns empty `supabaseUrl`/`supabaseKey` | Set both in `.env`; sign in again |
+| Copilot tab: "Kraken server unreachable" pill | `/v1/copilot/status` failed (server down, or 401 with a token the server can't verify) | Check `docker compose logs app`, `SUPABASE_JWT_SECRET`/JWKS and `SUPABASE_JWT_AUDIENCE` |
+| **Live orders** pill stays amber | The order stream was refused: origin not in `ALLOWED_ORIGINS` (close code 4403) or token rejected (4401) | Open the app at an allowed origin; sign in again. Updates still arrive by polling |
+| Approve and Reject buttons missing on a card | `orders_enabled` is false | See `orders_error` in the notice above the chat |
 
 ## Rotating credentials
 

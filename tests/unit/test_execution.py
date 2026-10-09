@@ -115,6 +115,19 @@ async def test_connect_error_is_not_sent():
     assert outcome.status == "not_sent" and outcome.journal.state == "NOT_SENT"
 
 
+async def test_token_revoked_at_send_is_not_sent_and_offers_a_fresh_card():
+    w = build_world()
+    p = await w.propose(BUY_INFY)
+    await w.client.get_positions()
+    w.fake.revoke_token()  # another login with the same UCC
+    outcome = await w.execution.approve(p.id, USER, p.payload_hash)
+    assert outcome.status == "not_sent" and outcome.journal.state == "NOT_SENT" and not w.fake.order_bodies
+    assert outcome.new_proposal is not None and outcome.new_proposal.id != p.id and "fresh card" in outcome.message
+    assert (await w.execution.approve(p.id, USER, p.payload_hash)).http_status == 409  # the spent card stays spent
+    fresh = await w.execution.approve(outcome.new_proposal.id, USER, outcome.new_proposal.payload_hash)
+    assert fresh.status == "sent" and w.fake.order_bodies == [p.payload.to_request_json()]
+
+
 async def test_timeout_after_accept_is_unknown_then_reconciled_never_resent():
     w = build_world()
     p = await w.propose(BUY_INFY)

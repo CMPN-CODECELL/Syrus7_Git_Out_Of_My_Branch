@@ -244,7 +244,8 @@ class KrakenRuntime:
                 from shared.infrastructure.celery_app import celery_app
 
                 items = sorted((k, analysis[k]) for k in new_symbols)
-                celery_app.send_task("historical.backfill_daily", kwargs={"items": items})
+                # Blocking broker call: keep it off the event loop that serves approvals.
+                await asyncio.to_thread(celery_app.send_task, "historical.backfill_daily", kwargs={"items": items})
         except Exception as exc:
             logger.debug("Publishing analysis watchlist failed: %s", exc)
 

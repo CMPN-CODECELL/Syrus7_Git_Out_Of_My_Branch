@@ -74,6 +74,8 @@ These tests run while the fake 021 injects 500, 503 and 429 errors (plus 30% ran
 | HTML gateway error or read timeout on a GET | Retried like a 503 | `::test_html_gateway_error_on_get_is_retried`, `::test_read_timeout_on_get_is_retried` |
 | Token revoked by another login, or expired | One single-flight re-login; the read is replayed once | `::test_revoked_token_triggers_single_relogin_and_read_is_replayed` |
 | Order POST times out (booked or not), or gets a 503 | Journal state UNKNOWN; **never resent**; the reconciler matches `GET /orders` → ACKED, NOT_PLACED, or AMBIGUOUS (never auto-resolved) | `tests/unit/test_execution.py::test_timeout_after_accept_is_unknown_then_reconciled_never_resent`, `tests/unit/test_reconciler_tracker.py::test_unknown_not_booked_becomes_not_placed_after_all_attempts`, `::test_two_identical_unlinked_orders_are_ambiguous_never_resent` |
+| Token revoked at the moment of sending (another login with the same UCC) | 401 → not sent, never replayed; the session is renewed and a fresh card is offered for a new click | `test_execution.py::test_token_revoked_at_send_is_not_sent_and_offers_a_fresh_card` |
+| Gemini rate limit (429) or overload (500/503) | 429: "wait about a minute"; 500/503: one quick retry, then an honest error. The real HTTP code is logged | `tests/unit/test_gemini_adapter.py` |
 | A 021 order already linked to one approval | Never counted for another | `test_reconciler_tracker.py::test_already_linked_order_is_not_reused` |
 | Server killed between approval and send | On boot, SENDING rows are reconciled from the order book before anything else; recovery never sends | `test_reconciler_tracker.py::test_boot_recovery_reconciles_rows_left_sending` |
 | Order appears in 021 after being marked NOT_PLACED | Linked when its event arrives, and reported | `test_reconciler_tracker.py::test_late_order_after_not_placed_is_linked_and_reported` |
@@ -109,6 +111,20 @@ UI card ─ Approve ─▶ POST /v1/proposals/{id}/approve ─▶ ExecutionServi
                                                                          └─▶ UserHub ─▶ WS /v1/stream/orders
 ```
 
+### Web UI
+
+Sign in at `/login.html` (Supabase). The dashboard opens on the **Copilot** tab ([frontend/copilot.js](frontend/copilot.js), [frontend/kraken-api.js](frontend/kraken-api.js)); the inherited Option Chain and Technicals tabs are still there.
+
+| What the trader sees | How |
+|---|---|
+| Chat with tool chips and expandable data tables | `POST /v1/chat`; tables are built from `data[].result`, never parsed from the reply |
+| An order card for each proposal, with a 60 s countdown, AMO badge and every notice | Rendered only from `GET /v1/proposals/{id}`; Approve echoes that card's `payload_hash` |
+| Approve outcomes: sent, rejected (021's reason), not sent, checking (unknown), re-quote (fresh card), expired | Approve response `status` / HTTP code ([docs/API.md](docs/API.md#post-v1proposalsidapprove)) |
+| Order journal with Kraken state and 021 status, updated live | `WS /v1/stream/orders` (JWT in the first message); polls `GET /v1/orders` every 10 s while the socket is down |
+| Health pills (021, instruments, feed, AI, orders, kill switch); Approve hidden when orders are off | `GET /v1/copilot/status` every 30 s |
+
+All server text is rendered with `textContent`, and the token goes only in the `Authorization` header (never a cookie). The UI has no automated tests yet. It was checked by hand in a browser against the fake 021: card → Approve → order sent → live fill; Reject; a "sell half" card with its rounding notice; a refusal when no fresh price is available.
+
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams of every flow. Key points:
 - `domains/broker` is the only code that talks to 021.
 - Exactly one uvicorn worker runs, because 021 allows one live token per account ([docker/supervisord.conf](docker/supervisord.conf)).
@@ -143,6 +159,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams of every flow. Key
    ```bash
    docker compose exec app python scripts/migrate.py
    ```
+   Then open http://127.0.0.1:8000/login.html, sign in, and use the **Copilot** tab. Open the app at an address listed in `ALLOWED_ORIGINS` (by default `http://127.0.0.1:8000` and `http://localhost:8000`); otherwise Approve returns 403 and live order updates are refused.
 3. Optional: a read-only check against the real sandbox. It logs in with your UCC, which revokes the token of any running Kraken that uses the same account:
    ```bash
    python scripts/smoke_021.py
@@ -177,6 +194,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams of every flow. Key
 - Realized P&L covers round trips made today; carried-forward closes are not counted, and the answer says so.
 - Chat history and per-user rate limits are in memory (one worker), so they reset on restart. Proposals and the order journal are in Postgres.
 - The inherited alert rules (`/v1/notifications`) require a verified login but have no producer feeding them; they are rebuilt in Level 3.
+- The inherited multi-day research export button is hidden, because its backend route was removed with the Black-Scholes code.
 
 ## Future scope
 

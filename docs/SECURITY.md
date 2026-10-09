@@ -71,7 +71,8 @@ If a secret leaks: rotate it at the source (021 web app password, Google AI Stud
 | Exact-origin CORS allowlist | built (inherited) | `ALLOWED_ORIGINS` |
 | Error responses carry a request ID, never a stack trace | built (not yet tested) | [app/main.py](../app/main.py) |
 | Internal ingestion key compared in constant time | built | [shared/middleware/auth.py](../shared/middleware/auth.py) |
-| UI renders with `textContent`, plus a strict CSP | planned (UI team) | [API.md](API.md) rendering rules |
+| Copilot UI renders all server text with `textContent` (no `innerHTML`); cards come only from the proposal row; token sent only as a Bearer header | built (checked by hand; no automated UI test) | [copilot.js](../frontend/copilot.js), [kraken-api.js](../frontend/kraken-api.js) |
+| Strict Content-Security-Policy | planned (the inherited pages use inline scripts and CDN scripts) | — |
 | Proposal/order/stream routes require a verified login; users only see their own proposals and orders | built | [orders router](../domains/orders/api/router.py); `test_other_users_cannot_see_or_approve` |
 | No CSRF token **by design**: Bearer-header auth (never cookies), approve/reject JSON-only and Origin-allowlisted, hash echo (ADR-011) | built | `test_approve_requires_login_json_and_allowed_origin` |
 | Order stream: Origin checked on the WebSocket handshake; JWT required in the first message (no token in the URL) | built | `test_stream_requires_auth_and_pushes_updates` |

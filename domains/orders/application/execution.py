@@ -115,13 +115,18 @@ class ExecutionService:
 
         entry = await self._send(journal, request_id)
         await self.hub.publish_journal(entry)
+        new = None
+        if entry.state == "NOT_SENT" and self._requote:
+            # 021 never processed it and this approval is spent: offer a fresh card for a new click.
+            # Nothing is resent automatically.
+            new = await self._requote(p)
         status, code, message = {
             "ACKED": ("sent", 200, "Sent to 021."),
             "REJECTED": ("rejected", 200, f"021 rejected the order: {entry.reason}"),
-            "NOT_SENT": ("not_sent", 200, f"Not sent: {entry.reason}"),
+            "NOT_SENT": ("not_sent", 200, f"Not sent: {entry.reason}" + (" A fresh card is ready to approve." if new else " Ask again for a fresh card.")),
             "UNKNOWN": ("unknown", 200, "Sent, but 021 did not confirm. Kraken is checking the order book; it will not be resent."),
         }[entry.state]
-        return ApproveOutcome(status, code, message, journal=entry, proposal=claim.proposal)
+        return ApproveOutcome(status, code, message, journal=entry, proposal=claim.proposal, new_proposal=new)
 
     async def _send(self, journal: JournalEntry, request_id: Optional[str]) -> JournalEntry:
         p = journal.payload

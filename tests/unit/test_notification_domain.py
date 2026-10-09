@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-import pytest
 
 from domains.notifications.domain.value_objects import (
     ConditionType,

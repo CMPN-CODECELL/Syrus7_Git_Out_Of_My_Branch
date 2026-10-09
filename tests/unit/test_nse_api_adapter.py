@@ -8,8 +8,7 @@ Tests the pure/static methods of NseApiAdapter without hitting live APIs.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from datetime import datetime, timezone
+from unittest.mock import patch, MagicMock
 import pandas as pd
 
 from domains.ingestion.infrastructure.outbound.nse_api_adapter import (

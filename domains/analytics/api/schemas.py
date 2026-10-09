@@ -162,34 +162,6 @@ class PricerTickerDataResponse(ResponseMetadata):
 
 
 
-class BSMCalculateRequest(BaseModel):
-    S0: float = Field(..., description="Stock price")
-    K: float = Field(..., description="Strike price")
-    T_days: int = Field(..., description="Expiry in days")
-    r: float = Field(..., description="Risk-free interest rate (percentage, e.g. 5.25)")
-    sigma: float = Field(..., description="Volatility (percentage, e.g. 28.4)")
-    option_type: str = Field(..., description="'call' or 'put'")
-    q: float = Field(0.0, description="Dividend yield (percentage, e.g. 0.55)")
-    market_mid: Optional[float] = Field(None, description="Current market midpoint price of option")
-
-
-class BSMCalculateResponse(BaseModel):
-    S0: float
-    K: float
-    T_years: float
-    r: float
-    sigma: float
-    option_type: str
-    q: float
-    d1: float
-    d2: float
-    Nd1: float
-    Nd2: float
-    fair_value: float
-    market_mid: Optional[float] = None
-    edge: Optional[float] = None
-
-
 # ── Technicals Response Schemas ─────────────────────────────────
 
 class IndicatorSignal(BaseModel):
@@ -239,4 +211,5 @@ class TechnicalsResponse(ResponseMetadata):
     moving_averages: list[MovingAverageItem]
     atr: float
     pivots: PivotsData
+    bar_count: int = 0
 

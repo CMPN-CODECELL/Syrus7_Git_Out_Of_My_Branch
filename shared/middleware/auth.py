@@ -1,88 +1,58 @@
-import json
-import base64
+import hmac
 import logging
-from typing import Optional, Dict, Any
-from fastapi import Request, Response, HTTPException, status
+
+from fastapi import Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.config.settings import get_settings
+from shared.auth.supabase_jwt import AuthError, bearer_token, verify_supabase_jwt
 
 logger = logging.getLogger("api.auth")
-
-
-def _decode_jwt_payload_unverified(token: str) -> Optional[Dict[str, Any]]:
-    """Helper to safely extract claims from JWT without signature verification if secret unavailable."""
-    try:
-        parts = token.split(".")
-        if len(parts) != 3:
-            return None
-        payload_b64 = parts[1]
-        # Pad if needed
-        padding = 4 - (len(payload_b64) % 4)
-        if padding and padding != 4:
-            payload_b64 += "=" * padding
-        decoded = base64.urlsafe_b64decode(payload_b64.encode("utf-8"))
-        return json.loads(decoded.decode("utf-8"))
-    except Exception as exc:
-        logger.debug("Failed decoding JWT payload: %s", exc)
-        return None
 
 
 class APIKeyAuthMiddleware(BaseHTTPMiddleware):
     """
     Defense-in-depth authentication middleware:
-    - Verifies internal service keys for ingestion and administrative routes.
-    - Inspects Bearer tokens for user mutation endpoints (alerts, watchlists).
-    - Allows read-only access for public market ticker / status endpoints.
+    - Internal service key (constant-time compare) for ingestion routes.
+    - Verified Supabase JWT (signature, expiry, audience) for every user-scoped route.
+      Unverified tokens are never trusted; request.state.user is set only after verification.
+    - Public read-only market routes stay open.
+    Route-level `Depends(require_user)` is the primary guard for new routers; this middleware
+    covers older routers that predate it.
     """
 
     PROTECTED_INGESTION_PREFIXES = ("/v1/ingestion/",)
-    PROTECTED_WRITE_PATHS = (
-        ("/v1/notifications/alerts", "POST"),
-        ("/v1/notifications/alerts", "DELETE"),
-    )
+    USER_PREFIXES = ("/v1/notifications/",)
 
     async def dispatch(self, request: Request, call_next) -> Response:
         settings = get_settings()
         path = request.url.path
-        method = request.method.upper()
 
-        auth_header = request.headers.get("Authorization", "")
-        api_key_header = request.headers.get("X-API-Key", "") or request.headers.get("X-Internal-API-Key", "")
+        token = bearer_token(request)
+        api_key = request.headers.get("X-API-Key", "") or request.headers.get("X-Internal-API-Key", "")
+        request.state.user = None
 
-        token = ""
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:].strip()
-        elif api_key_header:
-            token = api_key_header.strip()
-
-        # Extract user context if JWT
-        user_claims = _decode_jwt_payload_unverified(token) if token and "." in token else None
-        request.state.token = token
-        request.state.user = user_claims
-        request.state.authenticated = bool(token)
-
-        # 1. Internal ingestion route check
-        is_ingestion_path = any(path.startswith(prefix) for prefix in self.PROTECTED_INGESTION_PREFIXES)
-        if is_ingestion_path and settings.InternalApiKey:
-            if token != settings.InternalApiKey:
-                logger.warning("Unauthorized ingestion access attempt to %s from %s", path, request.client.host if request.client else "unknown")
+        # 1. Internal ingestion routes
+        if any(path.startswith(prefix) for prefix in self.PROTECTED_INGESTION_PREFIXES) and settings.InternalApiKey:
+            supplied = api_key or token
+            if not supplied or not hmac.compare_digest(supplied, settings.InternalApiKey):
+                logger.warning("Unauthorized ingestion access attempt to %s", path)
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid or missing internal API key"}
+                    content={"detail": "Invalid or missing internal API key"},
+                )
+            return await call_next(request)
+
+        # 2. User-scoped legacy routes require a verified user
+        if any(path.startswith(prefix) for prefix in self.USER_PREFIXES):
+            try:
+                request.state.user = verify_supabase_jwt(token)
+            except AuthError as exc:
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": str(exc)},
+                    headers={"WWW-Authenticate": "Bearer"},
                 )
 
-        # 2. Write protection for user mutation routes
-        for protected_path, protected_method in self.PROTECTED_WRITE_PATHS:
-            if path.startswith(protected_path) and method == protected_method:
-                # If SupabaseKey or InternalApiKey is configured, ensure request has a token
-                if (settings.SupabaseKey or settings.InternalApiKey) and not token:
-                    logger.warning("Unauthenticated %s attempt to %s", method, path)
-                    return JSONResponse(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        content={"detail": "Authentication required for this operation"}
-                    )
-
         return await call_next(request)
-

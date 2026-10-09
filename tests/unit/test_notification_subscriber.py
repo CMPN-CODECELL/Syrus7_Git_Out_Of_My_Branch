@@ -1,5 +1,5 @@
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 import pytest
 
 from domains.notifications.infrastructure.subscribers.notification_subscriber import NotificationStreamSubscriber

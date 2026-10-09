@@ -68,3 +68,9 @@ skills-lock.json
 # Research cache & raw daily Bhavcopy downloads
 research/data/raw/bhavcopy_cache/
 
+# Kraken runtime caches (021 instruments master, test caches)
+data/
+tests/.cache/
+.pytest_cache/
+.ruff_cache/
+

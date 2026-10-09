@@ -1,17 +1,14 @@
 """
-File Overview: Entry point for FastAPI application. Sets up middleware, lifespan hooks,
-and includes domain routers following hexagonal architecture.
-
-All Functions/Classes:
-- lifespan: Manages app lifecycle. Data: startup -> warm Redis/DB connections, shutdown -> close pools.
-- root: Health check endpoint. Data: None -> status dict.
+File Overview: Entry point for the Kraken FastAPI application. Sets up middleware, lifespan hooks
+(including the Kraken runtime that owns the single 021 login), and includes domain routers.
 
 Endpoints/APIs:
-- /: root (health check)
+- /health: health check
+- /v1/chat, /v1/chat/history, /v1/copilot/status: copilot (verified login required)
 - /ws/{symbol}: events_router (WebSocket)
-- /v1/derivatives: derivatives_router
-- /v1/symbols: symbols_router
-- /v1/ingestion/nse: nse_options_router
+- /v1/derivatives, /v1/pricer/ticker, /v1/symbols: analysis side-panel data (yfinance/NSE)
+- /v1/ingestion/nse: nse_options_router (internal API key)
+- /v1/notifications: legacy alert rules (verified login required; rebuilt in Phase 3)
 
 Database Tables:
 - None directly. Initializes connections for Redis and TimescaleDB.
@@ -32,9 +29,9 @@ from domains.analytics.api.events_router_api import router as events_router
 from domains.analytics.api.derivatives_router_api import router as derivatives_router
 from domains.analytics.api.symbols_router_api import router as symbols_router
 from domains.analytics.api.pricer_router_api import router as pricer_router
-from domains.analytics.api.export_research_api import router as export_research_router
 from domains.ingestion.api.nse_options_router_api import nse_options_router_api
 from domains.notifications.api.router import router as notifications_router
+from domains.copilot.api.router import router as copilot_router
 from app.config.settings import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +59,21 @@ async def lifespan(application: FastAPI):
     except Exception as exc:
         logger.warning("NSE client startup failed (will lazy-init on first use): %s", exc)
 
+    # Startup: Kraken runtime (021 gateway, instruments, market socket, copilot)
+    from app.runtime import KrakenRuntime
+    runtime = KrakenRuntime(get_settings())
+    application.state.kraken = runtime
+    try:
+        await runtime.start()
+    except Exception as exc:
+        logger.error("Kraken runtime failed to start: %s", exc)
+
     yield
+
+    try:
+        await runtime.stop()
+    except Exception as exc:
+        logger.warning("Kraken runtime shutdown error: %s", exc)
 
     # Shutdown: close NSE httpx client
     try:
@@ -77,7 +88,17 @@ async def lifespan(application: FastAPI):
     logger.info("All connection pools closed")
 
 
-app = FastAPI(title="AlphaStreams DDD Engine", lifespan=lifespan)
+app = FastAPI(title="Kraken API", lifespan=lifespan)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """No stack traces to clients; the request ID links the response to server logs."""
+    from fastapi.responses import JSONResponse
+
+    request_id = getattr(request.state, "request_id", None)
+    logger.exception("Unhandled error (request_id=%s)", request_id)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error", "request_id": request_id})
 
 from shared.middleware import (
     RequestIDMiddleware,
@@ -109,9 +130,9 @@ app.include_router(events_router, prefix="/v1")
 app.include_router(derivatives_router, prefix="/v1")
 app.include_router(symbols_router, prefix="/v1")
 app.include_router(pricer_router, prefix="/v1")
-app.include_router(export_research_router, prefix="/v1")
 app.include_router(nse_options_router_api, prefix="/v1/ingestion")
 app.include_router(notifications_router)
+app.include_router(copilot_router)
 
 
 @app.get("/health")

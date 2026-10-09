@@ -1,0 +1,22 @@
+target-version = "py311"
+line-length = 140
+extend-exclude = [".agents", "frontend", "tests/.cache", "data"]
+
+[lint]
+# Pyflakes (undefined names, unused imports/variables) + syntax-level pycodestyle errors.
+select = ["F", "E9", "E7"]
+ignore = ["E701", "E702", "E731"]
+
+[lint.per-file-ignores]
+"tests/**" = ["E402"]
+"app/main.py" = ["E402"]
+# Package re-exports.
+"**/__init__.py" = ["F401"]
+"shared/infrastructure/celery_app.py" = ["F401"]
+# Code inherited from the analytics codebase: unused imports are tracked as cleanup debt and
+# not auto-removed, because some are re-exports. New Kraken modules are linted strictly.
+"app/bootstrap.py" = ["F401"]
+"domains/analytics/**" = ["F401", "F541", "F841"]
+"domains/ingestion/**" = ["F401"]
+"domains/notifications/**" = ["F401"]
+"scripts/**" = ["F401"]

@@ -1,17 +1,17 @@
 # docker-compose.yml (Local Development)
+# Postgres and Redis run inside the container and are NOT published to the host.
+# Only the app port is exposed. Use `docker compose exec app psql ...` / `redis-cli` for debugging.
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: nexusquant-app:dev
-    ports: 
-      - '8000:8000'
-      - '5433:5432'
-      - '6379:6379'
+    image: kraken-app:dev
+    ports:
+      - '127.0.0.1:8000:8000'
     env_file: .env
     restart: unless-stopped
-    volumes: 
+    volumes:
       - .:/app
       - pg_data:/var/lib/postgresql/data
       - redis_data:/var/lib/redis

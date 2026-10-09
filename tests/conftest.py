@@ -1,12 +1,21 @@
 """
-Shared test fixtures for the MarketSentimentAnalysis2 test suite.
+Shared test fixtures for the Kraken test suite.
 
 Provides mock objects and sample data to enable offline unit testing
-without requiring Redis, Postgres, or live market API access.
+without requiring Redis, Postgres, live market APIs or the real 021 sandbox.
 """
+import os
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+# Must run before any app import: tests use TestingSettings (no .env) and blank credentials,
+# so nothing in the suite can log in to the real 021 account or call Gemini.
+os.environ["APP_ENV"] = "testing"
+for _var in ("TRADE_API_USERNAME", "TRADE_API_PASSWORD", "GEMINI_API_KEY", "SUPABASE_JWT_SECRET", "supabaseUrl"):
+    os.environ[_var] = ""
+os.environ["SUPABASE_JWT_SECRET"] = "test-only-jwt-secret-at-least-32-bytes-long!!"
+os.environ["INSTRUMENTS_CACHE_PATH"] = os.path.join(os.path.dirname(__file__), ".cache", "instruments.csv.gz")
+
+import pytest  # noqa: E402
+from unittest.mock import AsyncMock  # noqa: E402
 
 
 # ── Sample Data Fixtures ────────────────────────────────────────

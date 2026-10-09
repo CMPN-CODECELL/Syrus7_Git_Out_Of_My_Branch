@@ -1,19 +1,20 @@
-# docker-compose.prod.yml (Production Multi-Service Architecture)
-version: '3.8'
+# docker-compose.prod.yml (Multi-service deployment)
+# DB_PASSWORD and REDIS_PASSWORD are required; compose refuses to start without them.
+# Only the API port is published. Postgres and Redis stay on the internal network.
 
 services:
   postgres:
     image: timescale/timescaledb:latest-pg15
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${DB_USER:-kraken}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       POSTGRES_DB: NexusQuantDB
     volumes:
       - prod_pg_data:/var/lib/postgresql/data
       - ./scripts/init_schema.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d NexusQuantDB"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kraken} -d NexusQuantDB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,11 +29,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"]
     volumes:
       - prod_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,14 +50,15 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--loop", "uvloop"]
+    # Exactly one worker: it owns the single 021 login. More workers revoke each other's token.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--loop", "uvloop"]
     ports:
       - "8000:8000"
     env_file: .env
     environment:
       APP_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/NexusQuantDB
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${DB_USER:-kraken}:${DB_PASSWORD}@postgres:5432/NexusQuantDB
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,8 +81,8 @@ services:
     env_file: .env
     environment:
       APP_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/NexusQuantDB
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${DB_USER:-kraken}:${DB_PASSWORD}@postgres:5432/NexusQuantDB
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,11 +101,11 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    command: ["celery", "-A", "shared.infrastructure.celery_app:celery_app", "beat", "-l", "info"]
+    command: ["celery", "-A", "shared.infrastructure.celery_app:celery_app", "beat", "-l", "info", "--schedule", "/tmp/celerybeat-schedule"]
     env_file: .env
     environment:
       APP_ENV: production
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       redis:
         condition: service_healthy

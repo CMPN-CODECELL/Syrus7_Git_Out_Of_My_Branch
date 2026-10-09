@@ -1,0 +1,68 @@
+/*
+ * Kraken theme for the landing page (index.html, a saved Framer template).
+ * The template colours come from Framer tokens (--token-*). Its blue accents become gold; in
+ * dark mode the neutral tokens flip to black/gold. The sky/meadow photos behind sections are
+ * replaced by the theme's gradient, so the landing matches the app.
+ */
+
+/* Accents: blue -> gold (both themes) */
+body {
+    --token-b78e610c-391a-4120-aa0e-c0769ee3dfd0: #b38d16 !important;   /* primary blue #406ae4 */
+    --token-bddc6f23-9f6b-430c-b28d-50ac8b0b25ba: #d4af37 !important;   /* blue #3b82f6 */
+    --token-a6a29af8-9670-4cbf-81ec-cd0fd970b181: #e3c25a !important;   /* light blue #5290f4 */
+    --token-c2de9ec9-96e5-4565-81f0-1a5f789cc986: rgba(212, 175, 55, 0.5) !important;
+    --token-fffc2df6-9817-4522-b0c0-6b2c412b44dc: #f7efd6 !important;   /* pale blue tint */
+    --token-8a16c1e0-9178-435f-8361-d83efd74d213: #f6f1e4 !important;   /* light grey-blue surface */
+    --token-3992e4b1-4934-4fc5-9122-067e1dd544fa: #ebe3cf !important;   /* borders */
+    --token-3434016c-2b1b-421d-a7a4-de1700e08024: rgba(235, 227, 207, 0.7) !important;
+    background: var(--k-bg) !important;
+}
+
+/* Section photos (sky, meadow, clouds) -> theme gradient */
+[data-framer-name="BG Image"] {
+    background: var(--k-hero) !important;
+}
+[data-framer-name="BG Image"] img,
+img[alt="BG Image"],
+img[alt="Cloud Image"] {
+    opacity: 0 !important;
+}
+
+/* Gold glow behind the hero; the blue "AI" badge picks up a gold tint */
+img[alt="AI"], img[alt="Ai"], img[alt="AI Icon"] {
+    filter: sepia(1) saturate(2.2) hue-rotate(-12deg) brightness(1.02);
+}
+
+/* ── Dark mode: black / gold ── */
+html[data-theme="dark"] body {
+    --token-0edc2e6a-5fd1-47c5-a905-c3de9f07cea3: #f4f1ea !important;   /* main text #1d1d1d */
+    --token-b923e1cb-cf6e-406c-a3d3-6c79738c4b54: #a7a092 !important;   /* body text #4d585f */
+    --token-60bca774-6ba3-4c34-a431-2fd8d1ea1b8a: #e9e4d8 !important;   /* #323232 */
+    --token-a4ae1e21-2b71-445e-8792-31bd9220629a: #f4f1ea !important;   /* #000 */
+    --token-56aae5fc-f995-4aaa-9142-1f32f0eb2b60: #f4f1ea !important;   /* #131515 */
+    --token-cd1c7c13-ebd3-41ce-926a-aa3c5ab650b6: #a7a092 !important;   /* #494d4d */
+    --token-260f9222-11bc-40e3-a74c-4f1dae7b4ffa: #141312 !important;   /* white cards */
+    --token-26a3cfa5-e3af-4059-9057-52743845f2d4: #141312 !important;
+    --token-c8e383fb-35d5-4ae4-b05b-0cb994a7c51a: #141312 !important;
+    --token-8a16c1e0-9178-435f-8361-d83efd74d213: #1b1916 !important;   /* soft surfaces */
+    --token-fffc2df6-9817-4522-b0c0-6b2c412b44dc: rgba(212, 175, 55, 0.12) !important;
+    --token-3992e4b1-4934-4fc5-9122-067e1dd544fa: #2d2921 !important;   /* borders */
+    --token-3434016c-2b1b-421d-a7a4-de1700e08024: rgba(45, 41, 33, 0.7) !important;
+    --token-51f94b53-bb42-43ec-9cc4-5f5eec0c08b0: #5e5849 !important;
+    --token-456a706a-3175-452e-a8be-f8b4e2e708c1: rgba(20, 19, 18, 0.7) !important;
+    --token-e266aeaf-00d6-433e-94f9-0ad61361974f: rgba(20, 19, 18, 0.5) !important;
+    --token-0a34df0a-701b-4bf9-bdf5-c1a9964dab0b: rgba(20, 19, 18, 0.3) !important;
+    --token-1b8f888c-e7bb-4096-83cf-bc6a0a87c24d: rgba(20, 19, 18, 0) !important;
+    --token-3773b559-408e-44fa-b41c-14281b49a454: rgba(244, 241, 234, 0.5) !important;
+    color: var(--k-text);
+}
+
+/* Framer's white fade gradients are recoloured to black by kraken-landing.js in dark mode. */
+
+/* Template screenshots/illustrations stay as they are but sit softer on black */
+html[data-theme="dark"] img[alt="Dashboard"],
+html[data-theme="dark"] img[alt="Dashboard Image"],
+html[data-theme="dark"] img[alt="Decoration Image"],
+html[data-theme="dark"] img[alt="Vector"] {
+    filter: brightness(0.92);
+}

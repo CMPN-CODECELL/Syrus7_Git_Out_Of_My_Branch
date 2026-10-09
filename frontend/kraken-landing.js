@@ -43,18 +43,45 @@
             if (BRAND_FROM.test(node.nodeValue)) node.nodeValue = node.nodeValue.replace(BRAND_FROM, BRAND_TO);
             BRAND_FROM.lastIndex = 0;
         }
-        root.querySelectorAll(`img[src*="${TEMPLATE_WORDMARK}"]`).forEach((img) => {
-            img.src = "/kraken-wordmark.svg";
+        const wordmark = window.KrakenTheme ? window.KrakenTheme.wordmark() : "/kraken-wordmark.svg";
+        root.querySelectorAll(`img[src*="${TEMPLATE_WORDMARK}"], img[src*="kraken-wordmark"]`).forEach((img) => {
+            if (!img.getAttribute("src").endsWith(wordmark)) img.src = wordmark;
             img.alt = "Kraken";
+            img.setAttribute("data-kraken-wordmark", "");
         });
         if (BRAND_FROM.test(document.title)) document.title = "Kraken – AI Trading Copilot";
         BRAND_FROM.lastIndex = 0;
+    }
+
+    /** Framer fades sections into white with gradients set in its stylesheet. Tag them once so
+     *  kraken-landing.css can fade into black in dark mode. */
+    let fades = null;   // [{node, original}]
+    function applyFades() {
+        if (fades === null) {
+            fades = [];
+            document.querySelectorAll("body *").forEach((node) => {
+                const bg = getComputedStyle(node).backgroundImage;
+                if (bg && bg.includes("gradient") && /rgba?\(255, 255, 255/.test(bg)) fades.push({ node, original: bg });
+            });
+        }
+        const dark = document.documentElement.getAttribute("data-theme") === "dark";
+        fades.forEach(({ node, original }) => {
+            node.style.backgroundImage = dark
+                ? original.replace(/rgb\(255, 255, 255\)/g, "rgb(10, 10, 10)").replace(/rgba\(255, 255, 255,/g, "rgba(10, 10, 10,")
+                : "";
+        });
     }
 
     function fixAll() {
         fixLinks(document);
         fixBrand(document.body);
     }
+
+    window.addEventListener("kraken-theme", () => {
+        fixAll();
+        if (fades !== null) applyFades();
+    });
+    window.addEventListener("load", () => setTimeout(applyFades, 300));
 
     // Route clicks before Framer's client-side router sees them.
     window.addEventListener("click", (e) => {

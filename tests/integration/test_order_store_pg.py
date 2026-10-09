@@ -88,6 +88,22 @@ async def test_order_id_links_to_one_place_row_only(pg):
     assert not await store.link_order(jb.id, order_id)
 
 
+async def test_chat_log_round_trip(pg):
+    from domains.copilot.infrastructure.chat_log import PgChatLog
+
+    _, _, pool = pg
+    if await pool.fetchval("SELECT to_regclass('kraken_chat_turns')") is None:
+        pytest.skip("chat table missing; run scripts/migrate.py")
+    log, user = PgChatLog(pool), f"pg-test-{uuid.uuid4().hex[:8]}"
+    await log.append(user, "first", {"reply": "one", "proposals": [], "llm_available": True})
+    await log.append(user, "second", {"reply": "two", "proposals": ["p-1"], "llm_available": True})
+    turns = await log.recent(user, 10)
+    assert [t.message for t in turns] == ["first", "second"] and turns[1].reply["proposals"] == ["p-1"]
+    assert [t.message for t in await log.recent(user, 1)] == ["second"]
+    await log.clear(user)
+    assert await log.recent(user, 10) == []
+
+
 async def test_audit_is_append_only(pg):
     import asyncpg
 

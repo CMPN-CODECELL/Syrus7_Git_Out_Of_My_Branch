@@ -2284,31 +2284,19 @@ function initThemeSystem() {
     
     if (!themeBtn || !darkIcon || !lightIcon) return;
     
-    // Read cached preference or default to light
-    let currentTheme = localStorage.getItem("shaniTheme") || "light";
-    appState.theme = currentTheme;
-    
-    function applyTheme(theme) {
-        if (theme === "light") {
-            document.body.classList.add("light-theme");
-            darkIcon.style.display = "block";
-            lightIcon.style.display = "none";
-        } else {
-            document.body.classList.remove("light-theme");
-            darkIcon.style.display = "none";
-            lightIcon.style.display = "block";
-        }
+    // The shared Kraken theme switch (kraken-theme.js) owns the choice and body.light-theme;
+    // this only keeps the header icon in step.
+    function paintIcon(theme) {
+        appState.theme = theme;
+        darkIcon.style.display = theme === "light" ? "block" : "none";
+        lightIcon.style.display = theme === "light" ? "none" : "block";
     }
-    
-    // Initial apply
-    applyTheme(currentTheme);
-    
-    // Toggle on click
+
+    paintIcon(window.KrakenTheme ? window.KrakenTheme.get() : "light");
+    window.addEventListener("kraken-theme", (e) => paintIcon(e.detail));
+
     themeBtn.onclick = () => {
-        const newTheme = appState.theme === "dark" ? "light" : "dark";
-        appState.theme = newTheme;
-        localStorage.setItem("shaniTheme", newTheme);
-        applyTheme(newTheme);
+        if (window.KrakenTheme) window.KrakenTheme.toggle();
     };
 }
 
@@ -2383,9 +2371,9 @@ function initCanvasBackground() {
             
             // Adjust colors/opacities depending on light theme
             const colors = [
-                "rgba(99, 102, 241, 0.45)", // Indigo
-                "rgba(6, 182, 212, 0.45)",  // Teal
-                "rgba(243, 112, 33, 0.35)"   // Orange
+                "rgba(212, 175, 55, 0.45)", // Gold
+                "rgba(230, 195, 92, 0.40)", // Light gold
+                "rgba(168, 126, 26, 0.35)"  // Deep gold
             ];
             this.color = colors[Math.floor(Math.random() * colors.length)];
         }
@@ -2431,7 +2419,7 @@ function initCanvasBackground() {
                              (particles[a].y - particles[b].y) ** 2;
                 if (distSq < maxDistance ** 2) {
                     let opacity = 1 - Math.sqrt(distSq) / maxDistance;
-                    ctx.strokeStyle = `rgba(99, 102, 241, ${opacity * lineOpacityMultiplier})`;
+                    ctx.strokeStyle = `rgba(212, 175, 55, ${opacity * lineOpacityMultiplier})`;
                     ctx.lineWidth = 0.5;
                     ctx.beginPath();
                     ctx.moveTo(particles[a].x, particles[a].y);

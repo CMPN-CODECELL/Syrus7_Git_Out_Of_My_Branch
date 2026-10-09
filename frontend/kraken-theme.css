@@ -1,0 +1,73 @@
+/*
+ * Kraken design tokens, shared by every page.
+ *   light: white / gold      dark: black / gold
+ * kraken-theme.js sets <html data-theme>. Page stylesheets map their own variables onto these.
+ */
+:root,
+html[data-theme="light"] {
+    --k-bg: #ffffff;
+    --k-bg-soft: #fbf8f0;
+    --k-surface: #ffffff;
+    --k-surface-2: #f8f4e9;
+    --k-text: #141210;
+    --k-muted: #5f594c;
+    --k-border: #ebe3cf;
+    --k-gold: #c9a227;          /* fills, borders, icons */
+    --k-gold-hover: #b38d16;
+    --k-gold-text: #8a6a0e;     /* gold text on white (readable contrast) */
+    --k-gold-soft: #f7efd6;
+    --k-gold-glow: rgba(201, 162, 39, 0.18);
+    --k-on-gold: #141210;
+    --k-shadow: 0 10px 30px rgba(20, 18, 16, 0.06);
+    --k-hero: radial-gradient(1100px 520px at 50% -8%, rgba(212, 175, 55, 0.24), rgba(212, 175, 55, 0) 62%),
+              linear-gradient(180deg, #fffcf3 0%, #ffffff 70%);
+}
+
+html[data-theme="dark"] {
+    --k-bg: #0a0a0a;
+    --k-bg-soft: #0f0e0c;
+    --k-surface: #141312;
+    --k-surface-2: #1b1916;
+    --k-text: #f4f1ea;
+    --k-muted: #a7a092;
+    --k-border: #2d2921;
+    --k-gold: #d4af37;
+    --k-gold-hover: #e6c35c;
+    --k-gold-text: #e3c25a;
+    --k-gold-soft: rgba(212, 175, 55, 0.13);
+    --k-gold-glow: rgba(212, 175, 55, 0.22);
+    --k-on-gold: #141210;
+    --k-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --k-hero: radial-gradient(1100px 520px at 50% -8%, rgba(212, 175, 55, 0.20), rgba(212, 175, 55, 0) 62%),
+              linear-gradient(180deg, #0e0d0a 0%, #0a0a0a 70%);
+}
+
+/* Floating light/dark toggle (pages without their own) */
+.k-theme-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 2147483000;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--k-gold-text);
+    background: var(--k-surface);
+    border: 1px solid var(--k-border);
+    box-shadow: var(--k-shadow);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.k-theme-toggle:hover {
+    transform: translateY(-2px);
+    border-color: var(--k-gold);
+}
+
+.k-theme-toggle:focus-visible {
+    outline: 2px solid var(--k-gold);
+    outline-offset: 2px;
+}

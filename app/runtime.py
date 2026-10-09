@@ -56,10 +56,13 @@ async def _ohlc_repo():
 
 
 class KrakenRuntime:
-    def __init__(self, settings: Settings, *, llm=None, transport=None, order_store=None, audit_sink=None):
+    def __init__(self, settings: Settings, *, llm=None, transport=None, order_store=None, audit_sink=None, chat_log=None):
         self.settings = settings
         self.store = order_store
         self.audit = audit_sink
+        self._chat_log = chat_log
+        self._pool = None
+        self._pool_error: Optional[Exception] = None
         self.hub = UserHub()
         self.execution: Optional[ExecutionService] = None
         self.proposals: Optional[ProposalService] = None
@@ -100,6 +103,7 @@ class KrakenRuntime:
     # ── lifecycle ──
     async def start(self) -> None:
         self._load_instruments_from_disk()
+        await self.init_chat_log()
         await self.init_orders()
         if not self.broker.configured:
             logger.warning("021 credentials not configured; broker features disabled")
@@ -129,6 +133,36 @@ class KrakenRuntime:
         await self.socket.stop()
         await self.broker.aclose()
 
+    async def _db_pool(self):
+        """The Postgres pool, attempted once (an outage costs one 8 s wait at boot, not one per feature)."""
+        if self._pool is None and self._pool_error is None:
+            try:
+                from shared.infrastructure.database import get_database_pool
+
+                self._pool = await asyncio.wait_for(get_database_pool(), timeout=8)
+            except Exception as exc:
+                self._pool_error = exc
+        if self._pool is None:
+            raise self._pool_error or RuntimeError("database unavailable")
+        return self._pool
+
+    # ── chat history ──
+    async def init_chat_log(self) -> None:
+        """Durable chat history in Postgres when the table exists; otherwise in memory (until restart)."""
+        from domains.copilot.infrastructure.chat_log import MemoryChatLog, PgChatLog
+
+        log = self._chat_log
+        if log is None:
+            try:
+                pool = await self._db_pool()
+                if await pool.fetchval("SELECT to_regclass('kraken_chat_turns')") is None:
+                    raise RuntimeError("chat table missing; run scripts/migrate.py")
+                log = PgChatLog(pool)
+            except Exception as exc:
+                logger.warning("Chat history is in memory only (lost on restart): %s", str(exc)[:200])
+                log = MemoryChatLog()
+        self.chat.log = log
+
     # ── orders (Level 2) ──
     async def init_orders(self) -> bool:
         """Wire proposals, execution, reconciler and tracking. Needs a durable order store: without
@@ -137,9 +171,8 @@ class KrakenRuntime:
         if self.store is None:
             try:
                 from domains.orders.infrastructure.pg_store import PgAuditSink, PgOrderStore
-                from shared.infrastructure.database import get_database_pool
 
-                pool = await asyncio.wait_for(get_database_pool(), timeout=8)
+                pool = await self._db_pool()
                 if await pool.fetchval("SELECT to_regclass('kraken_order_journal')") is None:
                     raise RuntimeError("order tables missing; run scripts/migrate.py")
                 self.store, self.audit = PgOrderStore(pool), PgAuditSink(pool)
@@ -274,6 +307,7 @@ class KrakenRuntime:
             "watchlist_symbols": len(self._watchlist),
             "last_watchlist_sync": self.last_watchlist_sync.isoformat() if self.last_watchlist_sync else None,
             "llm_configured": bool(self.settings.GeminiApiKey),
+            "chat_history_durable": bool(getattr(self.chat.log, "durable", False)),
             "orders_enabled": self.execution is not None,
             "orders_error": self.orders_error,
             "orders_socket_connected": bool(self.orders_socket and self.orders_socket.connected),

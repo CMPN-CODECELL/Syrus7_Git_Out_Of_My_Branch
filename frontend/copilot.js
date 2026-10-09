@@ -261,6 +261,9 @@
             if (!item || !item.result || String(item.tool || "").startsWith("draft_")) return;
             msg.bubble.appendChild(renderToolData(item));
         });
+        if (data.data_trimmed) {
+            msg.bubble.appendChild(el("div", "kc-muted kc-small", "The data tables for this answer were too large to keep in history."));
+        }
 
         (data.proposals || []).forEach((id) => {
             const holder = el("div", "kc-card-slot");
@@ -316,6 +319,34 @@
         table.appendChild(body);
         wrap.appendChild(table);
         return wrap;
+    }
+
+    /** Re-render saved exchanges (GET /v1/chat/history). Cards are re-read from the server, so old
+     *  cards show their real state (expired, rejected, approved + live order status). */
+    async function loadHistory() {
+        try {
+            const { ok, data } = await KrakenAPI.json("/v1/chat/history?limit=30");
+            if (!ok || !data || !(data.turns || []).length) return;
+            const log = $("kc-log");
+            $("kc-empty")?.remove();
+            log.appendChild(el("div", "kc-divider", "Earlier conversation"));
+            data.turns.forEach((turn) => {
+                const user = addMessage("user");
+                user.bubble.textContent = turn.message;
+                user.wrap.appendChild(el("span", "kc-time", shortDateTime(turn.created_at)));
+                renderReply(addMessage("assistant"), turn.reply || {});
+            });
+            log.appendChild(el("div", "kc-divider", "New messages"));
+            scrollLog();
+        } catch (e) {
+            // history is a convenience; the chat works without it
+        }
+    }
+
+    function shortDateTime(iso) {
+        const d = new Date(iso);
+        if (isNaN(d)) return "";
+        return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
     }
 
     // ── order cards ──
@@ -753,6 +784,7 @@
         await refreshStatus();
         setInterval(refreshStatus, STATUS_POLL_MS);
         await loadOrders();
+        await loadHistory();
         startPolling();
         connectOrdersSocket();
     }

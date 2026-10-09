@@ -2,7 +2,8 @@
 Copilot HTTP API (for the chat UI).
 
 POST   /v1/chat            {"message": "..."} -> {"reply", "tools", "data", "llm_available"}
-DELETE /v1/chat/history    forget this user's conversation context
+GET    /v1/chat/history    this user's recent exchanges, oldest first (for re-rendering the chat)
+DELETE /v1/chat/history    forget this user's conversation (context and saved history)
 GET    /v1/copilot/status  broker / socket / instruments / LLM health
 
 Every route needs a verified Supabase token. /v1/chat is rate-limited per user.
@@ -65,9 +66,16 @@ async def chat(body: ChatRequest, request: Request, user: AuthUser = Depends(req
     return payload
 
 
+@router.get("/v1/chat/history")
+async def chat_history(request: Request, user: AuthUser = Depends(require_user), limit: int = 30) -> dict:
+    chat = _runtime(request).chat
+    turns = await chat.recent_turns(user.user_id, max(1, min(limit, 100)))
+    return {"turns": turns, "durable": bool(getattr(chat.log, "durable", False))}
+
+
 @router.delete("/v1/chat/history", status_code=status.HTTP_204_NO_CONTENT)
 async def clear_history(request: Request, user: AuthUser = Depends(require_user)) -> None:
-    _runtime(request).chat.clear_history(user.user_id)
+    await _runtime(request).chat.clear_history(user.user_id)
 
 
 @router.get("/v1/copilot/status")

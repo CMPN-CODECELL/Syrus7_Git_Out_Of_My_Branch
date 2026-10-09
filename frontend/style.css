@@ -1,32 +1,37 @@
-/* --- Core Design System & CSS Variables --- */
+/* --- Core Design System & CSS Variables ---
+ * Kraken theme: dark = black/gold (default block), light = white/gold (body.light-theme).
+ * kraken-theme.js keeps body.light-theme in sync with <html data-theme>; shared tokens live in
+ * kraken-theme.css. Gold fills carry dark text (--on-accent) for contrast.
+ */
 :root {
-    --bg-canvas: #0a0817;
-    --bg-card: rgba(20, 18, 43, 0.7);
-    --bg-card-header: rgba(10, 8, 23, 0.85);
-    --bg-input: rgba(255, 255, 255, 0.05);
-    --border-color: rgba(255, 255, 255, 0.08);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent-orange: #f37021;
-    --accent-orange-hover: #ff853a;
-    --accent-teal: #06b6d4;
-    --accent-indigo: #6366f1;
-    --accent-indigo-dark: #3c3580;
-    
+    --bg-canvas: #0a0a0a;
+    --bg-card: #141312;
+    --bg-card-header: #0f0e0c;
+    --bg-input: rgba(255, 255, 255, 0.04);
+    --border-color: #2d2921;
+    --text-primary: #f4f1ea;
+    --text-secondary: #a7a092;
+    --accent-orange: #d4af37;
+    --accent-orange-hover: #e6c35c;
+    --accent-teal: #e3c25a;
+    --accent-indigo: #d4af37;
+    --accent-indigo-dark: #6b520a;
+    --on-accent: #141210;
+
     /* Table specific variables */
-    --table-header-bg: #15122b;
-    --table-border: rgba(255, 255, 255, 0.08);
-    --table-itm-call-bg: #0c2024;
-    --table-itm-put-bg: #221813;
+    --table-header-bg: #12110f;
+    --table-border: #2d2921;
+    --table-itm-call-bg: #17150d;
+    --table-itm-put-bg: #1a1511;
     --table-otm-bg: transparent;
-    --table-hover-row-bg: rgba(255, 255, 255, 0.04);
-    --table-strike-bg: rgba(99, 102, 241, 0.08);
-    --table-strike-hover-bg: rgba(99, 102, 241, 0.15);
-    --table-strike-text: #818cf8;
+    --table-hover-row-bg: rgba(212, 175, 55, 0.06);
+    --table-strike-bg: rgba(212, 175, 55, 0.08);
+    --table-strike-hover-bg: rgba(212, 175, 55, 0.16);
+    --table-strike-text: #e3c25a;
     --bar-opacity: 0.18;
-    --bg-modal: #100e1f;
-    --border-modal: rgba(255, 255, 255, 0.1);
-    
+    --bg-modal: #121110;
+    --border-modal: #2d2921;
+
     /* Sentiment / Indicators */
     --color-up: #10b981;
     --color-down: #ef4444;
@@ -36,45 +41,51 @@
     --pivot-res-text: #f87171;
     --pivot-sup-bg: rgba(16, 185, 129, 0.15);
     --pivot-sup-text: #34d399;
-    --pivot-center-bg: rgba(99, 102, 241, 0.15);
-    --pivot-center-text: #a5b4fc;
+    --pivot-center-bg: rgba(212, 175, 55, 0.14);
+    --pivot-center-text: #e3c25a;
 }
 
 body.light-theme {
-    --bg-canvas: #f1f5f9;
+    --bg-canvas: #faf8f2;
     --bg-card: #ffffff;
-    --bg-card-header: #f8fafc;
+    --bg-card-header: #fbf8f0;
     --bg-input: #ffffff;
-    --border-color: #cbd5e1;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --accent-orange: #f37021;
-    --accent-orange-hover: #d8560c;
-    --accent-teal: #0d9488;
-    --accent-indigo: #4f46e5;
-    --accent-indigo-dark: #312e81;
+    --border-color: #ebe3cf;
+    --text-primary: #141210;
+    --text-secondary: #5f594c;
+    --accent-orange: #c9a227;
+    --accent-orange-hover: #b38d16;
+    --accent-teal: #8a6a0e;
+    --accent-indigo: #c9a227;
+    --accent-indigo-dark: #5c4708;
+    --on-accent: #141210;
 
     /* Pivot levels (light mode) */
     --pivot-res-bg: #fef2f2;
     --pivot-res-text: #dc2626;
     --pivot-sup-bg: #ecfdf5;
     --pivot-sup-text: #059669;
-    --pivot-center-bg: #f3f4f6;
-    --pivot-center-text: #1f2937;
-    
+    --pivot-center-bg: #f7efd6;
+    --pivot-center-text: #5c4708;
+
     /* Table specific variables */
-    --table-header-bg: #f8fafc;
-    --table-border: #e2e8f0;
-    --table-itm-call-bg: #ecfeff;
-    --table-itm-put-bg: #fff7ed;
+    --table-header-bg: #fbf8f0;
+    --table-border: #efe8d6;
+    --table-itm-call-bg: #fdf9ec;
+    --table-itm-put-bg: #fbf6f0;
     --table-otm-bg: #ffffff;
-    --table-hover-row-bg: #f1f5f9;
-    --table-strike-bg: #e0e7ff;
-    --table-strike-hover-bg: #c7d2fe;
-    --table-strike-text: #4338ca;
+    --table-hover-row-bg: #faf5e6;
+    --table-strike-bg: #f7efd6;
+    --table-strike-hover-bg: #efe0b0;
+    --table-strike-text: #6b520a;
     --bar-opacity: 0.22;
     --bg-modal: #ffffff;
-    --border-modal: #cbd5e1;
+    --border-modal: #ebe3cf;
+
+    /* Sentiment / Indicators */
+    --color-up: #059669;
+    --color-down: #dc2626;
+}
 
 /* --- Theme-Aware Pivot Level Grid Components --- */
 .pivot-pill-r {
@@ -102,10 +113,6 @@ body.light-theme {
     border-radius: 4px;
     text-align: center;
     border: 1px solid var(--border-color);
-}    
-    /* Sentiment / Indicators */
-    --color-up: #059669;
-    --color-down: #dc2626;
 }
 
 * {
@@ -160,14 +167,14 @@ body {
 }
 
 .header-clock:hover {
-    border-color: #3c3580;
+    border-color: var(--accent-indigo-dark);
     box-shadow: 0 2px 4px rgba(60, 53, 128, 0.08);
 }
 
 .clock-icon {
     display: inline-flex;
     align-items: center;
-    color: #f37021; /* Match logo accent/theme orange */
+    color: var(--accent-orange); /* Match logo accent/theme orange */
 }
 
 .clock-time {
@@ -231,9 +238,9 @@ body {
 }
 
 .dash-nav-link.active {
-    color: #f37021 !important;
+    color: var(--accent-orange) !important;
     font-weight: 600;
-    background-color: rgba(243, 112, 33, 0.12);
+    background-color: rgba(212, 175, 55, 0.12);
 }
 
 /* --- Header Section --- */
@@ -320,7 +327,7 @@ body {
 
 .filter-group select:focus {
     border-color: var(--accent-orange);
-    box-shadow: 0 0 0 2px rgba(243, 112, 33, 0.2);
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
 }
 
 .filter-divider {
@@ -777,7 +784,7 @@ input[type=range]::-webkit-slider-thumb:hover {
 
 /* ATM Strike Row Highlight */
 .nse-option-chain-table tr.atm-strike-row td {
-    background-color: rgba(99, 102, 241, 0.1) !important;
+    background-color: rgba(212, 175, 55, 0.1) !important;
 }
 
 .nse-option-chain-table tr.atm-strike-row td.strike-cell {
@@ -913,7 +920,7 @@ input[type=range]::-webkit-slider-thumb:hover {
 
 .nse-option-chain-table td.itm-shaded.bs-field.bs-overpriced {
     background-color: #fef0e6 !important; /* Soft ITM-tinted orange-red */
-    color: #ea580c !important;
+    color: var(--accent-orange-hover) !important;
 }
 
 
@@ -954,7 +961,7 @@ input[type=range]::-webkit-slider-thumb:hover {
 }
 
 .modal-header {
-    background-color: var(--accent-indigo-dark, #3c3580);
+    background-color: var(--accent-indigo-dark, var(--accent-indigo-dark));
     color: #ffffff;
     padding: 12px 20px;
     display: flex;
@@ -1060,7 +1067,7 @@ input[type=range]::-webkit-slider-thumb:hover {
 /* Theme-specific Modal Table Headers */
 #greeks-modal .calls-super th {
     background-color: var(--accent-teal) !important;
-    color: #0a0817 !important;
+    color: var(--bg-canvas) !important;
     font-size: 11px;
     padding: 6px 12px;
 }
@@ -1138,7 +1145,7 @@ body.light-theme #greeks-modal .puts-super th {
 
 #symbol-search-input:focus {
     border-color: var(--accent-orange);
-    box-shadow: 0 0 0 3px rgba(243, 112, 33, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .suggestions-dropdown {
@@ -1184,7 +1191,7 @@ body.light-theme #greeks-modal .puts-super th {
 }
 
 .suggestion-item:hover, .suggestion-item.active {
-    background-color: rgba(99, 102, 241, 0.15);
+    background-color: rgba(212, 175, 55, 0.15);
 }
 
 .suggestion-left {
@@ -1211,8 +1218,8 @@ body.light-theme #greeks-modal .puts-super th {
 
 .suggestion-type {
     font-size: 8.5px;
-    background-color: rgba(99, 102, 241, 0.15);
-    color: #a5b4fc;
+    background-color: rgba(212, 175, 55, 0.15);
+    color: var(--table-strike-text);
     padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
@@ -1224,7 +1231,7 @@ body.light-theme #greeks-modal .puts-super th {
 .suggestion-item:hover .suggestion-type, 
 .suggestion-item.active .suggestion-type {
     background-color: rgba(211, 84, 0, 0.18);
-    color: #f37021;
+    color: var(--accent-orange);
 }
 
 /* --- Research Export Modal --- */
@@ -1362,7 +1369,7 @@ body.light-theme .alert-field-group select option {
 }
 
 .info-modal-header {
-    background: linear-gradient(135deg, var(--accent-indigo-dark) 0%, #1e1b4b 100%);
+    background: linear-gradient(135deg, var(--accent-indigo-dark) 0%, var(--accent-indigo-dark) 100%);
     border-bottom: 3px solid var(--accent-orange);
     color: #ffffff;
 }
@@ -1402,7 +1409,7 @@ body.light-theme .alert-field-group select option {
 
 .info-tab-btn:hover {
     color: var(--text-primary);
-    background-color: rgba(99, 102, 241, 0.08);
+    background-color: rgba(212, 175, 55, 0.08);
 }
 
 .info-tab-btn.active {
@@ -1665,8 +1672,8 @@ body.light-theme .sebi-warning-box ul {
 
 /* --- Premium Brand Footer --- */
 .nse-footer {
-    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-    border-top: 4px solid #f37021;
+    background: linear-gradient(135deg, #0f172a 0%, var(--accent-indigo-dark) 100%);
+    border-top: 4px solid var(--accent-orange);
     padding: 50px 0 0 0;
     margin-top: 60px;
     font-size: 13px;
@@ -1698,7 +1705,7 @@ body.light-theme .sebi-warning-box ul {
 }
 
 .logo-accent {
-    color: #f37021;
+    color: var(--accent-orange);
 }
 
 .footer-desc {
@@ -1751,7 +1758,7 @@ body.light-theme .sebi-warning-box ul {
     color: #f8fafc;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid rgba(243, 112, 33, 0.3);
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
     padding-bottom: 8px;
     width: fit-content;
 }
@@ -1776,7 +1783,7 @@ body.light-theme .sebi-warning-box ul {
 }
 
 .footer-link:hover {
-    color: #f37021;
+    color: var(--accent-orange);
     transform: translateX(4px);
     text-decoration: none;
 }
@@ -2018,7 +2025,7 @@ body.light-theme .sebi-warning-box ul {
 
 .pill-neutral {
     background-color: rgba(245, 158, 11, 0.1);
-    color: #ea580c;
+    color: var(--accent-orange-hover);
     border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
@@ -2033,7 +2040,7 @@ body.light-theme .sebi-warning-box ul {
 
 #user-profile-badge:hover {
     background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(243, 112, 33, 0.5);
+    border-color: rgba(212, 175, 55, 0.5);
     transform: translateY(-1px);
 }
 
@@ -2058,7 +2065,7 @@ body.light-theme .sebi-warning-box ul {
     align-items: center;
     gap: 20px;
     padding: 20px 24px;
-    background: rgba(243, 112, 33, 0.05);
+    background: rgba(212, 175, 55, 0.05);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -2066,14 +2073,14 @@ body.light-theme .sebi-warning-box ul {
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #f37021, #d8560c);
+    background: linear-gradient(135deg, var(--accent-orange), var(--accent-orange-hover));
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
     font-weight: 800;
     color: #ffffff;
-    box-shadow: 0 4px 16px rgba(243, 112, 33, 0.4);
+    box-shadow: 0 4px 16px rgba(212, 175, 55, 0.4);
     border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -2092,8 +2099,8 @@ body.light-theme .sebi-warning-box ul {
 .profile-meta-badge {
     display: inline-block;
     padding: 2px 8px;
-    background: rgba(6, 182, 212, 0.15);
-    border: 1px solid rgba(6, 182, 212, 0.3);
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.3);
     color: #06b6d4;
     border-radius: 12px;
     font-size: 11px;
@@ -2135,8 +2142,8 @@ body.light-theme .sebi-warning-box ul {
 }
 
 .profile-input:focus {
-    border-color: #f37021;
-    box-shadow: 0 0 0 3px rgba(243, 112, 33, 0.2);
+    border-color: var(--accent-orange);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
 }
 
 .profile-input[readonly] {
@@ -2182,7 +2189,7 @@ body.light-theme .sebi-warning-box ul {
 }
 
 .profile-save-btn {
-    background: linear-gradient(135deg, #f37021, #d8560c);
+    background: linear-gradient(135deg, var(--accent-orange), var(--accent-orange-hover));
     color: white;
     border: none;
     border-radius: 6px;
@@ -2191,12 +2198,12 @@ body.light-theme .sebi-warning-box ul {
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(243, 112, 33, 0.3);
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
 }
 
 .profile-save-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(243, 112, 33, 0.5);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
 }
 
 .profile-alert {
@@ -2245,7 +2252,7 @@ body.light-theme .theme-toggle-btn {
     color: #ffffff;
     border-color: var(--accent-indigo);
     transform: scale(1.08);
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
 }
 
 .theme-toggle-btn svg {
@@ -2287,7 +2294,7 @@ body.light-theme .theme-toggle-btn {
 .ast-view-btn.active {
     background: var(--accent-indigo);
     color: #ffffff;
-    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 2px 6px rgba(212, 175, 55, 0.3);
 }
 
 /* Specific Light Theme fixes */
@@ -2302,7 +2309,7 @@ body.light-theme .super-header th.calls-super {
 
 body.light-theme .super-header th.puts-super {
     background-color: #ffeedb !important; /* Premium light orange for Puts (Opaque) */
-    color: #ea580c !important;
+    color: var(--accent-orange-hover) !important;
 }
 
 body.light-theme .super-header th.strike-super {
@@ -2387,7 +2394,7 @@ body.light-theme .suggestion-type {
     background: var(--accent-indigo) !important;
     border-color: var(--accent-indigo) !important;
     color: #ffffff !important;
-    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 2px 6px rgba(212, 175, 55, 0.3);
 }
 
 /* Watchlist Bar Theme Styling */
@@ -2461,7 +2468,7 @@ body.light-theme .suggestion-type {
 
 .custom-expiry-wrapper:focus-within {
     border-color: var(--accent-orange);
-    box-shadow: 0 0 0 2px rgba(243, 112, 33, 0.15);
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
 }
 
 #custom-expiry-date {
@@ -2512,7 +2519,7 @@ body.light-theme .suggestion-type {
     background-color: var(--accent-orange) !important;
     border-color: var(--accent-orange) !important;
     color: #ffffff !important;
-    box-shadow: 0 1px 4px rgba(243, 112, 33, 0.4);
+    box-shadow: 0 1px 4px rgba(212, 175, 55, 0.4);
 }
 
 .dte-badge {
@@ -2524,9 +2531,9 @@ body.light-theme .suggestion-type {
     font-size: 11px;
     font-weight: 700;
     font-family: 'Courier New', Courier, monospace;
-    background-color: rgba(99, 102, 241, 0.15);
+    background-color: rgba(212, 175, 55, 0.15);
     color: var(--accent-indigo);
-    border: 1px solid rgba(99, 102, 241, 0.25);
+    border: 1px solid rgba(212, 175, 55, 0.25);
     white-space: nowrap;
     height: 24px;
     letter-spacing: 0.3px;
@@ -2534,14 +2541,14 @@ body.light-theme .suggestion-type {
 
 body.light-theme .dte-badge {
     background-color: #eef2ff;
-    color: #4f46e5;
+    color: var(--accent-indigo);
     border-color: #c7d2fe;
 }
 
 .main-search-action-btn {
     padding: 0 18px;
     height: 36px;
-    background-color: #f37021;
+    background-color: var(--accent-orange);
     color: #ffffff;
     border: none;
     border-radius: 6px;
@@ -2555,8 +2562,8 @@ body.light-theme .dte-badge {
 }
 
 .main-search-action-btn:hover {
-    background-color: #d8560c;
-    box-shadow: 0 2px 8px rgba(243, 112, 33, 0.35);
+    background-color: var(--accent-orange-hover);
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.35);
 }
 
 .main-search-action-btn:active {
@@ -2575,3 +2582,42 @@ body.light-theme .dte-badge {
     opacity: 0.6;
 }
 
+
+/* --- Kraken: dark text on gold fills --- */
+.nse-csv-btn:hover,
+.ast-bar-right,
+.nse-option-chain-table tr.atm-strike-row td.strike-cell,
+#greeks-modal .puts-super th,
+.alert-submit-btn,
+.theme-toggle-btn:hover,
+.ast-view-btn.active,
+.ast-nav-btn:hover,
+.ast-nav-btn.active,
+.btn-preset:hover,
+.btn-preset.active,
+#open-bsm-modal-btn,
+#trigger-research-export-btn,
+#bsm-calculate-btn {
+    color: var(--on-accent) !important;
+}
+
+#user-avatar,
+#profile-modal-avatar {
+    background: linear-gradient(135deg, #e6c35c, #a87e1a) !important;
+    color: var(--on-accent) !important;
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.35) !important;
+}
+
+#add-to-watchlist-btn:not(:disabled) {
+    background-color: var(--accent-orange) !important;
+    color: var(--on-accent) !important;
+}
+
+.dash-nav-link.active,
+.logo-accent {
+    color: var(--k-gold-text) !important;
+}
+
+.dash-nav-link.active {
+    background: var(--k-gold-soft) !important;
+}

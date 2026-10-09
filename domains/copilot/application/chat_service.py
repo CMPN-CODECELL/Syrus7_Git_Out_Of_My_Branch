@@ -82,6 +82,7 @@ class CopilotChatService:
         *,
         drafts=None,
         history: Optional[ConversationStore] = None,
+        log=None,
         max_tool_calls: int = 6,
         max_message_chars: int = 1000,
     ):
@@ -89,6 +90,8 @@ class CopilotChatService:
         self._toolbox = toolbox
         self._drafts = drafts
         self._history = history or ConversationStore()
+        self.log = log                    # ChatLog (domains/copilot/infrastructure/chat_log.py) or None
+        self._seeded: set[str] = set()
         self._max_tool_calls = max_tool_calls
         self._max_message_chars = max_message_chars
 
@@ -99,8 +102,38 @@ class CopilotChatService:
     def enable_orders(self, drafts) -> None:
         self._drafts = drafts
 
-    def clear_history(self, user_id: str) -> None:
+    async def clear_history(self, user_id: str) -> None:
         self._history.clear(user_id)
+        self._seeded.add(user_id)
+        if self.log is not None:
+            await self.log.clear(user_id)
+
+    async def recent_turns(self, user_id: str, limit: int) -> list[dict]:
+        if self.log is None:
+            return []
+        return [t.to_dict() for t in await self.log.recent(user_id, limit)]
+
+    async def _context(self, user_id: str) -> list[tuple[str, str]]:
+        """LLM context: recent text turns. After a restart it is rebuilt once from the durable log,
+        skipping exchanges where the model was unavailable (as the in-memory store does)."""
+        if user_id not in self._seeded and not self._history.get(user_id) and self.log is not None:
+            self._seeded.add(user_id)
+            try:
+                for turn in await self.log.recent(user_id, HISTORY_TURNS // 2):
+                    if turn.reply.get("llm_available", True):
+                        self._history.append(user_id, "user", turn.message)
+                        self._history.append(user_id, "assistant", str(turn.reply.get("reply", "")))
+            except Exception as exc:
+                logger.warning("Could not load chat history for context: %s", type(exc).__name__)
+        return self._history.get(user_id)
+
+    async def _record(self, user_id: str, message: str, reply: "ChatReply") -> None:
+        if self.log is None:
+            return
+        try:
+            await self.log.append(user_id, message, reply_to_dict(reply))
+        except Exception as exc:  # history is a convenience; never fail the chat because of it
+            logger.warning("Could not save chat history: %s", type(exc).__name__)
 
     def _declarations(self) -> list[dict]:
         return TOOL_DECLARATIONS + (DRAFT_TOOL_DECLARATIONS if self._drafts is not None else [])
@@ -147,9 +180,9 @@ class CopilotChatService:
         traces: list[ToolTrace] = []
         data: list[dict] = []
         proposals: list[str] = []
+        context = await self._context(user_id)
         try:
-            conversation = self._llm.new_conversation(system_prompt(self.orders_enabled), self._declarations(),
-                                                      self._history.get(user_id))
+            conversation = self._llm.new_conversation(system_prompt(self.orders_enabled), self._declarations(), context)
             turn = await conversation.send_user(text)
             calls_made = 0
             while turn.function_calls:
@@ -168,7 +201,9 @@ class CopilotChatService:
                 calls_made += len(turn.function_calls)
                 turn = await conversation.send_tool_results(results)
         except LLMUnavailableError as exc:
-            return ChatReply(reply=str(exc), tools=traces, data=data, proposals=proposals, llm_available=False)
+            failed = ChatReply(reply=str(exc), tools=traces, data=data, proposals=proposals, llm_available=False)
+            await self._record(user_id, text, failed)
+            return failed
 
         reply = (turn.text or "").strip() or "I couldn't produce an answer. Please try rephrasing."
         if _ORDER_CLAIM.search(reply):
@@ -176,7 +211,9 @@ class CopilotChatService:
             reply = ORDER_CLAIM_FALLBACK
         self._history.append(user_id, "user", text)
         self._history.append(user_id, "assistant", reply)
-        return ChatReply(reply=reply, tools=traces, data=data, proposals=proposals)
+        result = ChatReply(reply=reply, tools=traces, data=data, proposals=proposals)
+        await self._record(user_id, text, result)
+        return result
 
 
 def reply_to_dict(reply: ChatReply) -> dict[str, Any]:

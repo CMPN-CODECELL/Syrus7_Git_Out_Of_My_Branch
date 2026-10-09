@@ -13,6 +13,10 @@ for _var in ("TRADE_API_USERNAME", "TRADE_API_PASSWORD", "GEMINI_API_KEY", "SUPA
     os.environ[_var] = ""
 os.environ["SUPABASE_JWT_SECRET"] = "test-only-jwt-secret-at-least-32-bytes-long!!"
 os.environ["INSTRUMENTS_CACHE_PATH"] = os.path.join(os.path.dirname(__file__), ".cache", "instruments.csv.gz")
+# Unit tests need no database or Redis: point at a closed local port so app start-up fails fast
+# (connection refused) instead of waiting on DNS. Integration runs can export real URLs.
+os.environ.setdefault("DATABASE_URL", "postgresql://kraken:unused@127.0.0.1:9/none")
+os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:9/0")
 
 import pytest  # noqa: E402
 from unittest.mock import AsyncMock  # noqa: E402

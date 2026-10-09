@@ -3,7 +3,7 @@ import pytest
 
 from domains.copilot.application.chat_service import CopilotChatService
 from domains.copilot.application.read_tools import ToolError
-from domains.copilot.domain.tool_specs import TOOL_DECLARATIONS
+from domains.copilot.domain.tool_specs import DRAFT_TOOL_DECLARATIONS, TOOL_DECLARATIONS
 from domains.copilot.ports import FunctionCall, LLMTurn, LLMUnavailableError
 
 
@@ -63,8 +63,12 @@ async def test_tool_results_are_fenced_as_untrusted_data():
 
 
 def test_no_tool_can_touch_orders():
+    # Read tools never mention orders at all; draft tools may only *draft*. Nothing sends or approves.
     names = {t["name"] for t in TOOL_DECLARATIONS}
     assert not any(word in name for name in names for word in ("place", "order", "cancel", "modify", "approve", "send", "trade"))
+    draft_names = {t["name"] for t in DRAFT_TOOL_DECLARATIONS}
+    assert draft_names == {"draft_order", "draft_modify_order", "draft_cancel_order"}
+    assert not any(word in name for name in names | draft_names for word in ("send", "approve", "confirm", "execute", "submit", "place"))
 
 
 async def test_unknown_tool_is_refused():
@@ -106,7 +110,7 @@ async def test_tool_call_budget_is_enforced():
 async def test_replies_claiming_an_order_action_are_replaced(claim):
     svc, _ = service([LLMTurn(text=claim)])
     reply = await svc.handle("u1", "buy 10 reliance")
-    assert "nothing was sent" in reply.reply
+    assert "nothing has been sent" in reply.reply
 
 
 async def test_typing_confirm_does_nothing_special():

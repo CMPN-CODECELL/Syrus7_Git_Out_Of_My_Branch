@@ -57,7 +57,7 @@ class ReadToolbox:
         self.s = services
 
     # ── helpers ──────────────────────────────────────────────────
-    def _resolve(self, text: str) -> Instrument:
+    def resolve_instrument(self, text: str) -> Instrument:
         query = text.strip().upper()
         store = self.s.instruments
         if len(store) == 0:
@@ -77,7 +77,7 @@ class ReadToolbox:
         inst = self.s.instruments.get(exchange, token)
         return safe_symbol(inst.symbol) if inst else f"token {token}"
 
-    async def _quotes(self, keys: list[tuple[int, int]], *, mode: str = "ltp", wait: float = QUOTE_WAIT_SECONDS) -> dict:
+    async def live_quotes(self, keys: list[tuple[int, int]], *, mode: str = "ltp", wait: float = QUOTE_WAIT_SECONDS) -> dict:
         """Live quotes for (ws_code, token) keys: {key: (ltp|None, stale, as_of|None)}."""
         out: dict = {}
         if not keys:
@@ -111,7 +111,7 @@ class ReadToolbox:
             raise ToolError(f"Could not fetch your portfolio from 021: {exc.user_message()}") from exc
         return positions, holdings, trades
 
-    def _holding_instrument(self, holding: dict) -> Optional[Instrument]:
+    def holding_instrument(self, holding: dict) -> Optional[Instrument]:
         isin = str(holding.get("isin") or "")
         return (self.s.instruments.equity_by_isin(isin) if isin else None) or self.s.instruments.equity(str(holding.get("symbol", "")))
 
@@ -128,9 +128,9 @@ class ReadToolbox:
             code = EXCHANGE_TO_WS_CODE.get(str(p.get("exchange")))
             if code is not None:
                 pos_keys[id(p)] = (code, int(p.get("token", 0) or 0))
-        hold_insts = {id(h): self._holding_instrument(h) for h in holdings}
+        hold_insts = {id(h): self.holding_instrument(h) for h in holdings}
         keys = list(set(pos_keys.values()) | {(i.ws_code, i.token) for i in hold_insts.values() if i})
-        quotes = await self._quotes(keys, mode="ltpc")
+        quotes = await self.live_quotes(keys, mode="ltpc")
 
         pos_rows, stale_symbols = [], []
         total_unrealized = total_realized = 0
@@ -203,10 +203,10 @@ class ReadToolbox:
                 candidates.append(("position", self._symbol_for(str(p.get("exchange")), int(p.get("token", 0) or 0)), qty, int(p.get("netPrice", 0) or 0), key))
         if scope in ("holdings", "both"):
             for h in holdings:
-                inst = self._holding_instrument(h)
+                inst = self.holding_instrument(h)
                 candidates.append(("holding", safe_symbol(h.get("symbol")), pm.holding_qty(h), int(h.get("price", 0) or 0), (inst.ws_code, inst.token) if inst else None))
 
-        quotes = await self._quotes([c[4] for c in candidates if c[4]], mode="ltpc")
+        quotes = await self.live_quotes([c[4] for c in candidates if c[4]], mode="ltpc")
         unpriced = []
         for kind, symbol, qty, avg, key in candidates:
             ltp, stale, _ = quotes.get(key, (None, True, None)) if key else (None, True, None)
@@ -231,11 +231,11 @@ class ReadToolbox:
         )
 
     async def get_average_price(self, symbol: str) -> dict:
-        inst = self._resolve(symbol)
+        inst = self.resolve_instrument(symbol)
         positions, holdings, _ = await self._portfolio()
         holding_rows = []
         for h in holdings:
-            h_inst = self._holding_instrument(h)
+            h_inst = self.holding_instrument(h)
             if (h_inst and h_inst.symbol == inst.symbol) or str(h.get("symbol", "")).upper() == inst.symbol:
                 holding_rows.append({"qty": pm.holding_qty(h), "avg_price": pm.rupees(int(h.get("price", 0) or 0)),
                                      "avg_price_paise": int(h.get("price", 0) or 0)})
@@ -267,9 +267,9 @@ class ReadToolbox:
         )
 
     async def get_quote(self, symbol: str) -> dict:
-        inst = self._resolve(symbol)
+        inst = self.resolve_instrument(symbol)
         key = (inst.ws_code, inst.token)
-        quotes = await self._quotes([key], mode="ltpc")
+        quotes = await self.live_quotes([key], mode="ltpc")
         ltp, stale, as_of = quotes[key]
         quote = self.s.cache.get(*key)
         return self._base(
@@ -283,7 +283,7 @@ class ReadToolbox:
         query = underlying.strip().upper()
         base = store.index(query) or store.equity(query)
         if base is None:
-            base = self._resolve(query)
+            base = self.resolve_instrument(query)
         today = today_ist()
         expiry = store.nearest_expiry(base.symbol, today=today)
         if expiry is None:
@@ -291,7 +291,7 @@ class ReadToolbox:
         options = [o for o in store.options(base.symbol) if o.expiry == expiry]
 
         spot_key = (base.ws_code, base.token)
-        spot_quotes = await self._quotes([spot_key])
+        spot_quotes = await self.live_quotes([spot_key])
         spot, spot_stale, spot_time = spot_quotes[spot_key]
         if spot is None:
             raise ToolError(f"021 has not sent a price for {safe_symbol(base.symbol)}, so the at-the-money strike cannot be picked.")
@@ -302,7 +302,7 @@ class ReadToolbox:
         window = strikes[max(0, idx - strikes_each_side): idx + strikes_each_side + 1]
         legs = {(o.strike_price, o.option_type): o for o in options if o.strike_price in window}
         keys = [(o.ws_code, o.token) for o in legs.values()]
-        chain_quotes = await self._quotes(keys, mode="oc", wait=CHAIN_WAIT_SECONDS)
+        chain_quotes = await self.live_quotes(keys, mode="oc", wait=CHAIN_WAIT_SECONDS)
 
         rows, missing = [], 0
         for strike in window:
@@ -376,11 +376,11 @@ class ReadToolbox:
         return out
 
     async def get_technicals(self, symbol: str) -> dict:
-        inst = self._resolve(symbol)
+        inst = self.resolve_instrument(symbol)
         data = await self._technicals_for(inst)
         yf_price = data.pop("_latest_analysis_price", None)
         divergence = None
-        quotes = await self._quotes([(inst.ws_code, inst.token)])
+        quotes = await self.live_quotes([(inst.ws_code, inst.token)])
         ltp, stale, _ = quotes[(inst.ws_code, inst.token)]
         if ltp is not None and yf_price:
             pct = round(abs(ltp / 100.0 - yf_price) / yf_price * 100.0, 2)
@@ -403,7 +403,7 @@ class ReadToolbox:
         universe: dict[tuple[str, int], tuple[Instrument, str]] = {}
         skipped: list[dict] = []
         for h in holdings:
-            inst = self._holding_instrument(h)
+            inst = self.holding_instrument(h)
             if inst is None:
                 skipped.append({"symbol": safe_symbol(h.get("symbol")), "reason": "not found in 021 instrument list"})
                 continue

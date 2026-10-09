@@ -14,6 +14,9 @@ Short records of decisions that shape Kraken. Each one gives the context, the de
 | [008](#adr-008-staleness-is-per-connection-not-per-tick) | Staleness is per connection, not per tick | Accepted |
 | [009](#adr-009-celery-never-talks-to-021) | Celery never talks to 021 | Accepted |
 | [010](#adr-010-supabase-for-app-login-verified-server-side) | Supabase for app login, verified server-side | Accepted |
+| [011](#adr-011-no-csrf-token-bearer-header-auth-origin-check-and-hash-echo) | No CSRF token: Bearer-header auth, Origin check and hash echo | Accepted |
+| [012](#adr-012-orders-require-a-durable-store-no-in-memory-fallback) | Orders require a durable store; no in-memory fallback | Accepted |
+| [013](#adr-013-unknown-outcomes-are-matched-never-guessed) | Unknown outcomes are matched, never guessed | Accepted |
 
 ---
 
@@ -99,3 +102,40 @@ Short records of decisions that shape Kraken. Each one gives the context, the de
 **Decision.** Keep Supabase as the login. The server verifies signature, expiry, audience and subject, using `SUPABASE_JWT_SECRET` (HS256) or the project's JWKS (ES256/RS256), and fails closed when neither is configured. Only the anon key reaches the browser.
 
 **Consequences.** Every user-scoped route depends on `require_user`. Local development needs a real Supabase project or a JWT secret. Tests sign their own tokens with a test-only secret.
+
+## ADR-011: No CSRF token: Bearer-header auth, Origin check and hash echo
+
+**Context.** The team plan listed a CSRF token on approve. CSRF works only when the browser attaches a credential automatically (a session cookie) to a request forged by another site.
+
+**Decision.** Do not use CSRF tokens. Kraken authenticates with `Authorization: Bearer <jwt>`, which browsers never attach on their own: forms, images and links cannot set it, and a cross-site `fetch` with that header triggers a CORS preflight that the exact-origin allowlist refuses. As defence in depth:
+- approve/reject accept only `application/json` and refuse any `Origin` outside `ALLOWED_ORIGINS`;
+- the order stream checks Origin on the handshake and needs a JWT in its first message;
+- approve must echo the `payload_hash` of the card the UI displayed.
+
+**Consequences.** This holds only while three things stay true:
+1. auth never moves to cookies;
+2. CORS stays an exact allowlist (never `*` with credentials);
+3. approve stays JSON-only.
+
+If any of these changes, add CSRF protection. XSS is the real threat to approval, and a CSRF token wouldn't stop it either. The defences are `textContent` rendering, CSP, and single-use, owner-bound, 60 s, hash-bound proposals. Tested in `test_orders_api.py::test_approve_requires_login_json_and_allowed_origin`.
+
+## ADR-012: Orders require a durable store; no in-memory fallback
+
+**Context.** Proposals, the order journal and the audit trail must survive restarts. A send interrupted by a crash must be reconciled at boot, or the trader can't know whether an order exists.
+
+**Decision.** In production, order features use Postgres (`kraken_proposals`, `kraken_order_journal`, `kraken_audit_log`; migration `kraken_002`). If the database or the tables are missing at start-up, order features stay **off** (`orders_enabled: false`, reason in `orders_error`) instead of falling back to memory. The atomic claim is one transaction (compare-and-set update plus journal insert). `UNIQUE(proposal_id)` and a partial unique index on PLACE `order_id` are second guards. The audit table is append-only through a trigger.
+
+**Consequences.** Running orders requires `scripts/migrate.py`. Unit tests use `MemoryOrderStore`, which has the same compare-and-set semantics. The Postgres store is exercised by `tests/integration/test_order_store_pg.py`, which needs a real database (run inside the container) and is skipped otherwise.
+
+## ADR-013: Unknown outcomes are matched, never guessed
+
+**Context.** 021 has no client order ID, so a timed-out POST can't be looked up by a key.
+
+**Decision.** An UNKNOWN PLACE is matched against `GET /orders` on token, exchange, product, |qty|, side, price (and trigger for SL), with `time ≥ sent_at − 30 s`, among orderIds not already linked to another PLACE.
+- Exactly one match → ACKED.
+- Several matches → AMBIGUOUS, shown to the trader and never resolved automatically.
+- None after the last check (about 20 s) → NOT_PLACED.
+
+An order that appears later is still linked when its socket event arrives, and the trader is told. Sends are serialised, so two of Kraken's own identical sends never overlap.
+
+**Consequences.** Identical manual orders placed in the 021 app at the same moment can make a row AMBIGUOUS. That is the honest outcome. The exit test proves no duplicates under random faults (`test_l2_exit.py`), and a mutation check that retries unknown sends makes that test fail.

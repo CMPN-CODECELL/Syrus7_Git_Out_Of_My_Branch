@@ -1,12 +1,20 @@
 # Kraken architecture
 
-This page describes the system as it is built today (Level 1, read-only). Parts planned for Levels 2–4 are marked **planned** and do not exist in the code yet. See [ROADMAP.md](ROADMAP.md).
+This page describes the system as it is built today: Level 1 (read-only questions) and Level 2 (orders with confirmation). Parts planned for Levels 3–4 are marked **planned** and do not exist in the code yet. See [ROADMAP.md](ROADMAP.md).
 
 ## 1. The invariant
 
-> The LLM can only read. It never has a tool that sends, modifies or cancels an order.
+> The LLM can read and draft. It never has a tool that sends, modifies, cancels or approves an order.
 
-In Level 1 this holds because no order tool exists ([tool_specs.py](../domains/copilot/domain/tool_specs.py)). From Level 2 on, the LLM may also *draft*. Deterministic code turns a draft into a server-side proposal, and only an authenticated human click on that exact proposal can send it (see [DECISIONS.md](DECISIONS.md), ADR-001).
+Draft tools ([draft_tools.py](../domains/copilot/application/draft_tools.py)) only save a proposal row. Deterministic code ([order_builder.py](../domains/copilot/application/order_builder.py)) turns the draft into an exact 021 payload. The **only** code path that sends anything to 021 is:
+
+```
+POST /v1/proposals/{id}/approve  (authenticated human click)
+  └─ ExecutionService.approve()  (owner, hash, expiry, kill switch, re-checks, atomic claim)
+       └─ TradeRestClient.place_order / modify_order / cancel_order   (one attempt, never retried)
+```
+
+See [DECISIONS.md](DECISIONS.md), ADR-001 and ADR-003.
 
 ## 2. System context
 
@@ -98,7 +106,9 @@ flowchart TB
 | `domains/broker` | 021 login, REST calls, error types, rate limit, read retries, instruments master | A |
 | `domains/marketdata` | Market socket, binary parsing, price cache, 021 ↔ yfinance symbol map | B |
 | `domains/historical` | Daily candles: Timescale store, yfinance fetch, Celery backfill | B |
-| `domains/copilot` | LLM port and Gemini adapter, read tools, chat orchestration, chat API | C (tools/LLM), D (API) |
+| `domains/copilot` | LLM port and Gemini adapter, read tools, draft tools, order builder/validator, price parsing, chat orchestration, chat API | C (tools/LLM/builder), D (API) |
+| `domains/orders` | Proposal service, execution service, reconciler, order tracker, user hub, order store (memory/Postgres), orders API | A (execution, journal, reconciler), D (proposal store, API, audit) |
+| `domains/marketdata/infrastructure/orders_socket.py` | Orders websocket client with REST catch-up on reconnect | B |
 | `shared/contracts` | Cross-team Pydantic models (paise ints, `extra="forbid"`) | all; changes need review from both sides of a seam |
 | `shared/auth`, `shared/middleware/auth.py` | Supabase JWT verification | D |
 | `domains/analytics`, `domains/ingestion`, `domains/notifications` | Inherited analysis feed, side-panel endpoints and legacy alerts | B / D |
@@ -135,7 +145,7 @@ sequenceDiagram
   API->>Auth: verify signature, exp, aud, sub
   API->>API: per-user rate limit, length cap
   API->>Chat: handle(user_id, message)
-  Chat->>LLM: system prompt + history (text only) + read-only tool declarations
+  Chat->>LLM: system prompt + history (text only) + read and draft tool declarations
   LLM-->>Chat: function_call get_pnl {}
   Chat->>Chat: validate args (strict model, extra keys rejected)
   Chat->>Tools: get_pnl()
@@ -181,7 +191,7 @@ stateDiagram-v2
 | **Read (GET)** | Retry up to 3× with full-jitter backoff (0.5·2ⁿ s, cap 8 s); 429 honours `Retry-After` and pauses the shared limiter | Re-login once, replay once | Retry |
 | **Order action** (POST/PUT/DELETE `/orders`) | **No retry.** 500 with error text → `BrokerRejectedError`; other 5xx or lost response → `BrokerOutcomeUnknownError` | Re-login, report **not sent**, no replay | `BrokerUnavailableError` ("not sent") |
 
-The order methods exist in [rest_client.py](../domains/broker/infrastructure/rest_client.py) and are tested. In Level 1 nothing calls them.
+The order methods in [rest_client.py](../domains/broker/infrastructure/rest_client.py) are called only by `ExecutionService._send()` (section 11).
 
 ### Instruments
 
@@ -242,30 +252,86 @@ All cross-module models are in [shared/contracts](../shared/contracts):
 
 Units: prices are `int` paise everywhere; ₹ formatting happens only for display (`portfolio_math.rupees`). Quantity sign is the side.
 
-## 11. Order lifecycle (planned, Level 2)
+## 11. Orders (Level 2)
+
+### Proposal and send flow
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant T as Trader
+  participant UI
+  participant Chat as CopilotChatService
+  participant LLM as Gemini
+  participant B as OrderBuilder
+  participant P as ProposalService/Store
+  participant X as ExecutionService
+  participant R as TradeRestClient
+  participant K as 021
+
+  T->>UI: "Sell half my TCS"
+  UI->>Chat: POST /v1/chat
+  Chat->>LLM: tools incl. draft_order
+  LLM-->>Chat: draft_order {SELL, TCS, HALF}
+  Chat->>B: build_place(OrderDraft)
+  B->>R: GET holdings/positions, live 021 price
+  B-->>Chat: BuiltOrder (payload, card, source_check) or question/refusal
+  Chat->>P: create → kraken_proposals (PROPOSED, hash, +60 s)
+  Chat-->>UI: reply + proposals[id]
+  UI->>P: GET /v1/proposals/{id} (card from the row)
+  T->>UI: clicks Approve
+  UI->>X: POST /v1/proposals/{id}/approve {payload_hash}
+  X->>X: owner, state, expiry, hash, kill switch
+  X->>B: pre_send_check: limits, instruments fresh, drift ≤ 0.5%, source qty, order still open
+  X->>P: claim: PROPOSED→APPROVED + journal SENDING (one transaction)
+  X->>R: place_order (one attempt, sends serialised)
+  R->>K: POST /orders
+  K-->>R: orderId / rejection / timeout
+  X->>P: journal ACKED / REJECTED / NOT_SENT / UNKNOWN
+  X-->>UI: result + WS order_update
+```
+
+### Proposal states
 
 ```mermaid
 stateDiagram-v2
-  [*] --> DRAFTED: LLM draft_order
-  DRAFTED --> PROPOSED: validator ok, proposal row + payload hash, TTL 60 s
-  DRAFTED --> [*]: validation failed (explained)
-  PROPOSED --> APPROVED: human click, CAS PROPOSED→APPROVED, hash match, not expired, drift ≤ 0.5%
-  PROPOSED --> EXPIRED: TTL / price drift
-  APPROVED --> SENDING
-  SENDING --> ACKED: 200 + orderId
-  SENDING --> REJECTED: BrokerRejectedError
-  SENDING --> UNKNOWN: BrokerOutcomeUnknownError
-  UNKNOWN --> ACKED: reconciler finds it in GET /orders
-  UNKNOWN --> NOT_PLACED: reconciler confirms absent
-  ACKED --> OPEN
-  OPEN --> EXECUTED
-  OPEN --> PARTIAL
-  OPEN --> CANCELLED
-  OPEN --> REJECTED
-  PARTIAL --> EXECUTED
+  [*] --> PROPOSED: builder ok, row + payload hash, expires in 60 s
+  PROPOSED --> APPROVED: approve (owner, hash match, not expired, checks ok) — atomic, one winner
+  PROPOSED --> REJECTED: trader rejects
+  PROPOSED --> EXPIRED: 60 s passed, price drift > 0.5% (fresh card offered), or a pre-send check failed
 ```
 
-None of this exists yet beyond the contracts, the no-retry order methods and the orders-socket parser.
+### Journal states (one row per approved proposal; `UNIQUE(proposal_id)`)
+
+```mermaid
+stateDiagram-v2
+  [*] --> SENDING: claim
+  SENDING --> ACKED: 021 returned orderId (or modify/cancel accepted)
+  SENDING --> REJECTED: 021 risk rejection (HTTP 500 + reason)
+  SENDING --> NOT_SENT: request never reached 021 (connect error, 401, 429, 4xx)
+  SENDING --> UNKNOWN: timeout / 5xx / lost response / crash (boot recovery)
+  UNKNOWN --> ACKED: reconciler: exactly one matching unlinked 021 order
+  UNKNOWN --> AMBIGUOUS: several match (shown to trader, never resent)
+  UNKNOWN --> NOT_PLACED: none after checks at ~2/5/10/20 s
+  NOT_PLACED --> ACKED: order appears late (tracker late-link, trader told)
+```
+
+After ACKED, `order_status` follows 021 (Pending → Executed / Rejected / Cancelled …). [OrderTracker](../domains/orders/application/tracker.py) updates it:
+- On each orders-socket event it re-reads `GET /orders/{id}`, plus that order's trades for fills, because REST is the source of truth.
+- After every socket reconnect it catches up with `GET /orders`, because 021 doesn't replay missed events.
+- An RMS square-off is labelled as such.
+
+Updates reach the trader through [UserHub](../domains/orders/application/hub.py) → `WS /v1/stream/orders`.
+
+### Storage
+
+| Table | Purpose | Guards |
+|---|---|---|
+| `kraken_proposals` | immutable payload, hash, card, draft, reference price, source check, state | state CHECK; CAS updates only |
+| `kraken_order_journal` | one execution per proposal; order id, status, fills, reason, reconcile schedule | `UNIQUE(proposal_id)`; partial unique `order_id` for PLACE rows |
+| `kraken_audit_log` | append-only trail linked by request/proposal/journal/order id | trigger rejects UPDATE/DELETE |
+
+If these tables are missing, `KrakenRuntime.init_orders()` leaves order features off and reports `orders_error` (ADR-012). Tests use `MemoryOrderStore`, which has the same semantics.
 
 ## 12. Configuration
 
@@ -277,7 +343,8 @@ All settings are in [app/config/settings.py](../app/config/settings.py), read fr
 app/                    FastAPI app, settings, Celery config, KrakenRuntime
 domains/broker/         021 REST client, token manager, rate limiter, errors, instruments
 domains/marketdata/     market socket, packet parsers, price cache, symbol map
-domains/copilot/        LLM port + Gemini adapter, read tools, chat service, chat API
+domains/copilot/        LLM port + Gemini adapter, read + draft tools, order builder, parsing, chat service, chat API
+domains/orders/         proposals, execution, reconciler, tracker, user hub, order store, orders API
 domains/historical/     daily candles, yfinance fetch, Celery backfill
 domains/analytics/      technical indicators engine (+ inherited side-panel endpoints)
 domains/ingestion/      inherited NSE/yfinance analysis feed

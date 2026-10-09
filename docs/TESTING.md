@@ -61,8 +61,24 @@ To keep tests fast, give the client a virtual clock: `sleep` advances the time t
 | Contracts: payload rules, hashes, proposals, plans, instructions | `test_contracts.py` |
 | Auth: JWT verification and protected routes | `test_auth.py` |
 | Log redaction | `test_redaction.py` |
+| Price/expiry text parsing, tick rounding in the trader's favour | `test_parsing.py` |
+| Order builder: every L2 validation rule (quantity, half/all, lots, ticks, circuits, SL, product, index, shorts, AMO, limits, kill switch, modify/cancel lookup) | `test_order_builder.py` |
+| Approval and execution: single-use, owner, hash, expiry, drift re-quote, source re-check, kill switch, stale instruments, each send outcome, modify/cancel | `test_execution.py` |
+| Reconciler and tracker: not placed, ambiguous, linked-order reuse, boot recovery, cancel vs fill, socket fills/rejections, REST catch-up, late links | `test_reconciler_tracker.py` |
+| Orders API: card → approve → journal, JSON-only, Origin, owner checks, reject, WebSocket auth and pushes | `test_orders_api.py` |
+| Chat + draft tools: cards created, broker never called from chat, clarifications, tools hidden when orders are off | `test_chat_drafts.py` |
+| **L2 exit:** 200 runs, random send faults, concurrent double approvals; zero duplicates, exact payloads, truthful journal | `test_l2_exit.py` |
 
-`tests/integration` and `tests/e2e` are inherited and need Postgres/Redis; CI doesn't run them.
+The Level 2 tests share [tests/fakes/orders_world.py](../tests/fakes/orders_world.py), which assembles the fake 021, instruments, prices, builder, in-memory order store, execution service, reconciler and tracker. `Fake021` also supports `order_fault_rate` (random send faults: timeout after booking, timeout before booking, 503, risk rejection), `fill(order_id, qty, price)` and `order_bodies` (exactly what 021 booked).
+
+The Postgres order store has its own tests, which need a database. Run them in the container:
+
+```bash
+docker compose exec app python scripts/migrate.py
+docker compose exec -e KRAKEN_PG_TESTS=1 app python -m pytest tests/integration/test_order_store_pg.py -q
+```
+
+The other `tests/integration` and `tests/e2e` files are inherited and need Postgres/Redis; CI doesn't run them.
 
 ## Phase exit criteria
 
@@ -72,7 +88,7 @@ Each phase must pass its exit check under fault injection before the next one st
 |---|---|---|
 | 0 | Empty app boots, CI green, contracts merged | done |
 | 1 | The four L1 questions + oversold screen answer correctly with 500/503/429 injected and yfinance off | done: `test_l1_read_tools.py` |
-| 2 | Zero duplicate orders across 200 runs with random timeouts; sent payload always equals displayed payload | planned |
+| 2 | Zero duplicate orders across 200 runs with random timeouts; sent payload always equals displayed payload | done: `test_l2_exit.py` (a mutation that retries unknown sends makes it fail) |
 | 3 | Kill the server mid-fire and restart: the instruction fires exactly once; 1,000 ticks below the level give one order | planned |
 | 4 | With one leg forced to reject, the report shows exactly which legs filled or were rejected and why; no silent retries | planned |
 | 5 | Chaos runs, prompt-injection red-team set, NL eval set (100+ prompts); every README claim links to code or a test | planned |

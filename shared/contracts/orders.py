@@ -2,7 +2,7 @@ import hashlib
 import json
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -54,8 +54,9 @@ class OrderPayload(BaseModel):
 
 
 class OrderDraft(BaseModel):
-    """What the LLM may extract from a message. Never sent anywhere; deterministic code turns it
-    into an OrderPayload after resolving the instrument and validating every field."""
+    """What the LLM may extract from a message. Never sent anywhere: the deterministic
+    OrderBuilder resolves the instrument, parses prices from the raw text, and validates.
+    Prices stay as the trader's text so the LLM never does money arithmetic."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -64,10 +65,31 @@ class OrderDraft(BaseModel):
     quantity: Optional[int] = Field(None, gt=0)
     quantity_mode: Literal["UNITS", "LOTS", "HALF", "ALL"] = "UNITS"
     order_type: Literal["MARKET", "LIMIT", "SL"] = "MARKET"
-    limit_price_paise: Optional[int] = Field(None, gt=0)
-    trigger_price_paise: Optional[int] = Field(None, gt=0)
+    limit_price: Optional[str] = Field(None, max_length=32)
+    trigger_price: Optional[str] = Field(None, max_length=32)
     product: Optional[Product] = None
-    exchange_hint: Optional[RequestExchange] = None
+    exchange_hint: Optional[Literal["NSE", "BSE"]] = None
+    validity: Validity = "Day"
+    instrument_kind: Literal["EQUITY", "OPTION", "FUTURE"] = "EQUITY"
+    expiry: Optional[str] = Field(None, max_length=32)
+    strike: Optional[str] = Field(None, max_length=32)
+    option_type: Optional[Literal["CE", "PE"]] = None
+    source: Optional[Literal["HOLDING", "POSITION"]] = None  # for HALF/ALL when both exist
+    short: bool = False
+
+
+class OrderChangeDraft(BaseModel):
+    """Modify or cancel an existing open order, identified by description."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    symbol_query: str = Field(min_length=1, max_length=64)
+    side: Optional[Literal["BUY", "SELL"]] = None
+    stop_loss_only: bool = False
+    order_id: Optional[str] = Field(None, max_length=32)
+    new_limit_price: Optional[str] = Field(None, max_length=32)
+    new_trigger_price: Optional[str] = Field(None, max_length=32)
+    new_quantity: Optional[int] = Field(None, gt=0)
 
 
 class ProposalDisplay(BaseModel):
@@ -80,11 +102,22 @@ class ProposalDisplay(BaseModel):
     side: Literal["BUY", "SELL"]
     quantity: int = Field(gt=0)
     lots: Optional[int] = None
+    lot_size: Optional[int] = None
     order_type: Literal["MARKET", "LIMIT", "SL"]
+    product: Optional[Product] = None
+    validity: Optional[Validity] = None
+    limit_price_paise: Optional[int] = None
+    trigger_price_paise: Optional[int] = None
+    amo: bool = False
+    action: Literal["PLACE", "MODIFY", "CANCEL"] = "PLACE"
+    target_order_id: Optional[str] = None
     reference_ltp_paise: Optional[int] = None
     reference_ltp_as_of: Optional[datetime] = None
     estimated_value_paise: Optional[int] = None
     notices: list[str] = Field(default_factory=list)
+
+
+ProposalState = Literal["PROPOSED", "APPROVED", "REJECTED", "EXPIRED"]
 
 
 class OrderProposal(BaseModel):
@@ -101,7 +134,14 @@ class OrderProposal(BaseModel):
     display: ProposalDisplay
     created_at: datetime
     expires_at: datetime
-    state: Literal["PROPOSED", "APPROVED", "REJECTED", "EXPIRED"] = "PROPOSED"
+    state: ProposalState = "PROPOSED"
+    state_reason: Optional[str] = None
+    decided_at: Optional[datetime] = None
+    # What the builder saw, so approval can re-check it (drift, "sell half" source quantity).
+    reference_ltp: Optional[int] = None
+    source_check: Optional[dict[str, Any]] = None
+    draft: Optional[dict[str, Any]] = None
+    request_id: Optional[str] = None
 
     @model_validator(mode="after")
     def _hash_matches(self) -> "OrderProposal":
@@ -110,6 +150,39 @@ class OrderProposal(BaseModel):
         if self.kind != "PLACE" and not self.target_order_id:
             raise ValueError("MODIFY/CANCEL proposals need target_order_id")
         return self
+
+
+JournalState = Literal["SENDING", "ACKED", "REJECTED", "NOT_SENT", "UNKNOWN", "NOT_PLACED", "AMBIGUOUS"]
+FINAL_ORDER_STATUSES = frozenset({"Executed", "Rejected", "Cancelled"})
+
+
+class JournalEntry(BaseModel):
+    """One execution of one approved proposal. proposal_id is unique: a proposal can be sent once."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    proposal_id: uuid.UUID
+    user_id: str
+    action: Literal["PLACE", "MODIFY", "CANCEL"]
+    payload: OrderPayload
+    payload_hash: str
+    target_order_id: Optional[str] = None
+    state: JournalState = "SENDING"
+    order_id: Optional[str] = None
+    order_status: Optional[str] = None
+    filled_qty: int = 0
+    avg_fill_price: Optional[int] = None
+    reason: Optional[str] = None
+    sent_at: datetime
+    updated_at: datetime
+    reconcile_attempts: int = 0
+    next_reconcile_at: Optional[datetime] = None
+    display: Optional[ProposalDisplay] = None
+
+    @property
+    def unresolved(self) -> bool:
+        return self.state in ("SENDING", "UNKNOWN")
 
 
 OrderStatus = Literal[

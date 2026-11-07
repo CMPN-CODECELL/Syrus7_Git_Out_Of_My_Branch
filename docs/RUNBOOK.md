@@ -26,7 +26,8 @@ Copy `.env.example` to `.env`. Write each line as `KEY=value`, with no spaces ar
 | `TRADE_API_MAX_GET_RETRIES` | no | Read retries (default 3) |
 | `INSTRUMENTS_CACHE_PATH` | no | Disk cache for the instruments file (default `data/instruments.csv.gz`) |
 | `GEMINI_API_KEY` | yes for chat | Google AI Studio key, usually starting with `AIza` |
-| `GEMINI_MODEL` | no | Default `gemini-2.5-flash` |
+| `GEMINI_MODEL` | no | Default `gemini-3.5-flash`. The newest models often have the smallest free quota |
+| `GEMINI_FALLBACK_MODELS` | no | Comma-separated models tried in order when the main one hits its quota (429) or is unavailable; quotas are per model. Default `gemini-3.6-flash,gemini-3.5-flash,gemini-flash-lite-latest` |
 | `CHAT_MAX_MESSAGE_CHARS`, `CHAT_RATE_LIMIT_PER_MINUTE`, `CHAT_MAX_TOOL_CALLS` | no | Chat guards (1000 / 20 / 6) |
 | `BACKFILL_DAYS` | no | Days of daily history to keep and backfill (default 400) |
 | `TRADING_KILL_SWITCH` | no | `true` blocks all new cards and all approvals immediately after restart (default `false`) |
@@ -120,7 +121,7 @@ It logs in, counts positions, holdings and orders, downloads and decodes instrum
 | `silent_subscriptions > 0` | Unknown token, wrong exchange code, or an invalid `oc` filter | Check the instrument with `get_quote`; refresh instruments |
 | Answers say prices are stale | Socket down, or quiet for over 30 s | Check `market_socket_connected` and `last_error`; outside market hours only the last snapshot exists |
 | "not enough data for RSI(14)" / symbols skipped in screens | No stored daily history yet (new listing, unmapped symbol, backfill not run, yfinance down) | Wait for the backfill (08:45 IST, or right after a symbol first appears); check Celery logs |
-| Chat replies "The AI hit its Gemini request limit" | Gemini 429. The free tier allows about 10 requests a minute, and each chat message uses 2 or more | Wait a minute; use a paid key or a model with a higher limit (`GEMINI_MODEL`) for demos. Logs show `Gemini call failed: ... code=429` |
+| Chat replies "The AI hit its Gemini request limit on every configured model" | Gemini 429 on the main model and every fallback. Each chat message uses 2 or more requests, and teammates sharing a key share its quota | Wait a minute; add more models to `GEMINI_FALLBACK_MODELS`; enable billing on the key's Google project for demos. Logs show `Gemini call failed: model=… code=429` for each model tried |
 | Approve says "session had been replaced … NOT sent" and logs show `021 login ok` about every minute | Something else logs in with the same UCC (a teammate's Kraken, `smoke_021.py`, another instance), and each login revokes the other | Run exactly one process per UCC; give each teammate their own 021 account. Nothing was sent; approve the fresh card |
 | Chat replies "The language model is unavailable right now." | Gemini key missing or invalid, quota exhausted, or network | Check `GEMINI_API_KEY` and the Google AI Studio quota |
 | 401 on `/v1/chat` | Missing or expired Supabase token, wrong `SUPABASE_JWT_SECRET`, or audience mismatch | Log in again; check the secret/JWKS and `SUPABASE_JWT_AUDIENCE` |

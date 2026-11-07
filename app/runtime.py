@@ -70,10 +70,26 @@ class KrakenRuntime:
         self.tracker: Optional[OrderTracker] = None
         self.orders_socket: Optional[OrdersSocketClient] = None
         self.orders_error: Optional[str] = None
+        self.paper_broker = None
+
+        if settings.PaperTrading:
+            from domains.broker.infrastructure.paper_broker import PaperBroker, PaperMarketSocket
+            self.paper_broker = PaperBroker(
+                ucc=settings.TradeApiUsername or "PAPER_TRADER",
+                password=settings.TradeApiPassword or "paper-password",
+                instruments_path=settings.InstrumentsCachePath,
+            )
+            transport = transport or self.paper_broker.transport()
+            username = settings.TradeApiUsername or "PAPER_TRADER"
+            password = settings.TradeApiPassword or "paper-password"
+        else:
+            username = settings.TradeApiUsername
+            password = settings.TradeApiPassword
+
         self.broker = TradeRestClient(
             settings.TradeApiBaseUrl,
-            settings.TradeApiUsername,
-            settings.TradeApiPassword,
+            username,
+            password,
             timeout_seconds=settings.TradeApiTimeoutSeconds,
             rate_per_second=settings.TradeApiRatePerSecond,
             max_get_retries=settings.TradeApiMaxGetRetries,
@@ -83,13 +99,16 @@ class KrakenRuntime:
         self.instruments = InstrumentStore()
         self.instrument_repo = InstrumentRepository(settings.InstrumentsCachePath)
         self.cache = PriceCache()
-        self.socket = MarketSocketClient(settings.TradeWsBaseUrl, self.broker.get_ephemeral_key, self.cache)
+        if settings.PaperTrading:
+            self.socket = PaperMarketSocket(self.cache, self.instruments, self.paper_broker)
+        else:
+            self.socket = MarketSocketClient(settings.TradeWsBaseUrl, self.broker.get_ephemeral_key, self.cache)
         from domains.historical.infrastructure.yfinance_daily import fetch_daily_candles
 
         self.candles = CandleService(_ohlc_repo, fetch_daily_candles, days=settings.BackfillDays)
         self.toolbox = ReadToolbox(MarketServices(self.broker, self.instruments, self.socket, self.cache, self.candles))
         self.chat = CopilotChatService(
-            llm or GeminiLLM(settings.GeminiApiKey, settings.GeminiModel),
+            llm or GeminiLLM(settings.GeminiApiKey, settings.GeminiModel.strip(), fallbacks=settings.get_gemini_fallbacks()),
             self.toolbox,
             history=ConversationStore(),
             max_tool_calls=settings.ChatMaxToolCalls,
@@ -116,7 +135,8 @@ class KrakenRuntime:
             if recovered:
                 logger.warning("Recovered %d order(s) left mid-send by a restart; reconciling before anything else", recovered)
             self.reconciler.start()
-            self.orders_socket.start()
+            if self.orders_socket is not None:
+                self.orders_socket.start()
 
     async def stop(self) -> None:
         for task in self._tasks:
@@ -177,9 +197,14 @@ class KrakenRuntime:
                     raise RuntimeError("order tables missing; run scripts/migrate.py")
                 self.store, self.audit = PgOrderStore(pool), PgAuditSink(pool)
             except Exception as exc:
-                self.orders_error = f"order store unavailable: {exc}"[:200]
-                logger.error("Order features disabled: %s", self.orders_error)
-                return False
+                if self.settings.PaperTrading:
+                    from domains.orders.infrastructure.memory_store import MemoryAuditSink, MemoryOrderStore
+                    logger.info("Database unavailable; using in-memory order store & audit sink for paper trading")
+                    self.store, self.audit = MemoryOrderStore(), MemoryAuditSink()
+                else:
+                    self.orders_error = f"order store unavailable: {exc}"[:200]
+                    logger.error("Order features disabled: %s", self.orders_error)
+                    return False
         builder = OrderBuilder(self.toolbox)
         self.proposals = ProposalService(self.store, self.audit)
         drafts = DraftToolbox(builder, self.proposals)
@@ -190,9 +215,12 @@ class KrakenRuntime:
             self.store, self.broker, self.audit, self.hub,
             pre_send_check=builder.pre_send_check, requote=drafts.requote, on_unknown=self.reconciler.kick,
         )
-        self.orders_socket = OrdersSocketClient(
-            self.settings.TradeWsBaseUrl, self.broker.get_ephemeral_key, self.tracker.on_packet, self.tracker.catch_up,
-        )
+        if self.settings.PaperTrading:
+            self.orders_socket = None
+        else:
+            self.orders_socket = OrdersSocketClient(
+                self.settings.TradeWsBaseUrl, self.broker.get_ephemeral_key, self.tracker.on_packet, self.tracker.catch_up,
+            )
         self.chat.enable_orders(drafts)
         self.orders_error = None
         return True
@@ -207,8 +235,9 @@ class KrakenRuntime:
     def _load_instruments_from_disk(self) -> None:
         text, loaded_for = self.instrument_repo.load()
         if text:
-            self.instruments.load(parse_instruments_csv(text), loaded_for=loaded_for)
-            logger.info("Loaded %d instruments from disk cache (for %s)", len(self.instruments), loaded_for)
+            effective_date = today_ist() if self.settings.PaperTrading else loaded_for
+            self.instruments.load(parse_instruments_csv(text), loaded_for=effective_date)
+            logger.info("Loaded %d instruments from disk cache (for %s)", len(self.instruments), effective_date)
 
     async def refresh_instruments(self) -> None:
         raw = await self.broker.download_instruments()
@@ -224,13 +253,16 @@ class KrakenRuntime:
     async def _instrument_loop(self) -> None:
         while True:
             if not self.instruments.is_fresh():
-                try:
-                    await self.refresh_instruments()
-                except Exception as exc:
-                    self.last_error = f"instrument refresh failed: {type(exc).__name__}"
-                    logger.warning("%s (%s)", self.last_error, exc)
-                    await asyncio.sleep(60)
-                    continue
+                if self.settings.PaperTrading:
+                    self._load_instruments_from_disk()
+                else:
+                    try:
+                        await self.refresh_instruments()
+                    except Exception as exc:
+                        self.last_error = f"instrument refresh failed: {type(exc).__name__}"
+                        logger.warning("%s (%s)", self.last_error, exc)
+                        await asyncio.sleep(60)
+                        continue
             await asyncio.sleep(INSTRUMENT_CHECK_SECONDS)
 
     # ── watchlist ──
@@ -294,6 +326,7 @@ class KrakenRuntime:
     # ── status ──
     def status(self) -> dict:
         return {
+            "paper_trading": self.settings.PaperTrading,
             "broker_configured": self.broker.configured,
             "broker_token_expires_at": self.broker.tokens.expires_at.isoformat() if self.broker.tokens.expires_at else None,
             "instruments_loaded": len(self.instruments),

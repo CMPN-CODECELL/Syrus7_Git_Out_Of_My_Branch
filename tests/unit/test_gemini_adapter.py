@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from domains.copilot.infrastructure.gemini_adapter import GeminiConversation, unavailable_message
+from domains.copilot.infrastructure.gemini_adapter import GeminiConversation, ModelPool, unavailable_message
 from domains.copilot.ports import LLMUnavailableError
 
 
@@ -14,26 +14,31 @@ class ApiError(Exception):
 
 
 class FakeModels:
-    def __init__(self, outcomes):
-        self.outcomes = list(outcomes)
-        self.calls = 0
+    """outcomes: a list (any model) or {model: list} per model."""
 
-    async def generate_content(self, **_):
+    def __init__(self, outcomes):
+        self.outcomes = outcomes if isinstance(outcomes, dict) else {None: list(outcomes)}
+        self.calls = 0
+        self.models_called = []
+
+    async def generate_content(self, *, model, **_):
         self.calls += 1
-        outcome = self.outcomes.pop(0)
+        self.models_called.append(model)
+        queue = self.outcomes.get(model, self.outcomes.get(None))
+        outcome = queue.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
 
 
-def conversation(outcomes):
+async def no_sleep(_):
+    return None
+
+
+def conversation(outcomes, model="gemini-test"):
     models = FakeModels(outcomes)
     client = SimpleNamespace(aio=SimpleNamespace(models=models))
-
-    async def no_sleep(_):
-        return None
-
-    return GeminiConversation(client, "gemini-test", None, [], sleep=no_sleep), models
+    return GeminiConversation(client, model, None, [], sleep=no_sleep), models
 
 
 def ok_response(text="hi"):
@@ -59,6 +64,38 @@ async def test_overloaded_twice_gives_an_honest_error():
     with pytest.raises(LLMUnavailableError, match="trouble"):
         await conv._generate()
     assert models.calls == 2
+
+
+async def test_rate_limited_model_falls_back_and_cools_down():
+    now = [0.0]
+    pool = ModelPool(["main", "backup"], clock=lambda: now[0])
+    models = FakeModels({"main": [ApiError(429), ok_response("main again")], "backup": [ok_response("from backup"), ok_response("still backup")]})
+    client = SimpleNamespace(aio=SimpleNamespace(models=models))
+
+    first = GeminiConversation(client, pool, None, [], sleep=no_sleep)
+    assert (await first._generate()).text == "from backup"
+    second = GeminiConversation(client, pool, None, [], sleep=no_sleep)
+    assert (await second._generate()).text == "still backup"          # main is cooling down: not even tried
+    assert models.models_called == ["main", "backup", "backup"]
+
+    now[0] = 61.0                                                      # cool-down over: main is preferred again
+    third = GeminiConversation(client, pool, None, [], sleep=no_sleep)
+    assert (await third._generate()).text == "main again"
+
+
+async def test_bad_request_does_not_fall_back():
+    pool = ModelPool(["main", "backup"])
+    conv, models = conversation({"main": [ApiError(400)], "backup": [ok_response()]}, model=pool)
+    with pytest.raises(LLMUnavailableError):
+        await conv._generate()
+    assert models.models_called == ["main"]
+
+
+async def test_every_model_limited_gives_the_limit_message():
+    pool = ModelPool(["main", "backup"])
+    conv, _ = conversation({"main": [ApiError(429)], "backup": [ApiError(429)]}, model=pool)
+    with pytest.raises(LLMUnavailableError, match="every configured model"):
+        await conv._generate()
 
 
 def test_messages_by_code():

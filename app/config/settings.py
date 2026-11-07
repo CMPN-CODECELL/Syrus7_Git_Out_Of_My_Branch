@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     SupabaseJwtAudience: str = Field("authenticated", validation_alias="SUPABASE_JWT_AUDIENCE")
 
     # 021 Trade broker (server-side only; never logged, never sent to the LLM or browser)
+    PaperTrading: bool   = Field(False, validation_alias="PAPER_TRADING")
     TradeApiBaseUrl: str = Field("https://devapi.021.trade/api/developer-api/v1", validation_alias="TRADE_API_BASE_URL")
     TradeWsBaseUrl: str  = Field("wss://devapi.021.trade/api/developer/websocket", validation_alias="TRADE_WS_BASE_URL")
     TradeApiUsername: str = Field("", validation_alias="TRADE_API_USERNAME")
@@ -55,7 +56,10 @@ class Settings(BaseSettings):
 
     # LLM (Gemini). Key stays server-side.
     GeminiApiKey: str = Field("", validation_alias="GEMINI_API_KEY")
-    GeminiModel: str  = Field("gemini-2.5-flash", validation_alias="GEMINI_MODEL")
+    GeminiModel: str  = Field("gemini-3.5-flash", validation_alias="GEMINI_MODEL")
+    # Tried in order when the main model is rate-limited (429) or unavailable; quotas are per model.
+    GeminiFallbackModels: str = Field("gemini-3.6-flash,gemini-3.5-flash,gemini-flash-lite-latest",
+                                      validation_alias="GEMINI_FALLBACK_MODELS")
     ChatMaxMessageChars: int = Field(1000, validation_alias="CHAT_MAX_MESSAGE_CHARS")
     ChatRateLimitPerMinute: int = Field(20, validation_alias="CHAT_RATE_LIMIT_PER_MINUTE")
     ChatMaxToolCalls: int = Field(6, validation_alias="CHAT_MAX_TOOL_CALLS")
@@ -82,6 +86,9 @@ class Settings(BaseSettings):
         if not self.AllowedOrigins or self.AllowedOrigins.strip() == "*":
             return ["http://localhost:8000", "http://127.0.0.1:8000"]
         return [o.strip() for o in self.AllowedOrigins.split(",") if o.strip()]
+
+    def get_gemini_fallbacks(self) -> list[str]:
+        return [m.strip() for m in self.GeminiFallbackModels.split(",") if m.strip()]
 
     def get_allowed_exchanges(self) -> set[str]:
         return {e.strip().upper() for e in self.AllowedExchanges.split(",") if e.strip()}

@@ -65,6 +65,11 @@ def parse_instruments_csv(text: str) -> list[Instrument]:
             values["board_lot_quantity"] = max(1, values["board_lot_quantity"])
             values["ticksize"] = max(1, values["ticksize"])
             values["symbol"] = values.get("symbol", "").upper()
+            if not values["symbol"] and values.get("exchange") == "NSEIDX":
+                if values.get("token") == 26000:
+                    values["symbol"] = "NIFTY"
+                elif values.get("token") == 26009:
+                    values["symbol"] = "BANKNIFTY"
             rows.append(Instrument.model_validate(values))
         except Exception:
             skipped += 1
@@ -140,11 +145,12 @@ class InstrumentStore:
 
     def nearest_expiry(self, underlying_symbol: str, *, today: Optional[date] = None, exchange: str = "NSEFO") -> Optional[int]:
         today = today or today_ist()
-        for raw in self.option_expiries(underlying_symbol, exchange=exchange):
+        expiries = self.option_expiries(underlying_symbol, exchange=exchange)
+        for raw in expiries:
             expiry_date = expiry_to_date(raw, today=today)
             if expiry_date is not None and expiry_date >= today:
                 return raw
-        return None
+        return expiries[0] if expiries else None
 
     def search(self, query: str, *, limit: int = 8) -> list[Instrument]:
         """Exact symbol first, then prefix matches, cash and index instruments only."""

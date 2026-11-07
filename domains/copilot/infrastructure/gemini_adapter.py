@@ -1,23 +1,53 @@
 """
 Gemini adapter (google-genai SDK). Manual function calling only: automatic function calling is
 disabled so every tool call passes through Kraken's argument validation and audit.
+
+Model fallback: quotas are per model, so when the configured model is rate-limited (429) or
+missing (404) the same request goes to the next model in GEMINI_FALLBACK_MODELS, and the limited
+model is skipped for a cool-down. Re-sending a request is safe: an LLM call has no side effects
+(tools run only after Kraken validates the model's reply).
 """
 import asyncio
 import logging
-from typing import Any, Optional
+import time
+from typing import Any, Callable, Optional
 
 from domains.copilot.ports import FunctionCall, LLMTurn, LLMUnavailableError
 
 logger = logging.getLogger(__name__)
 
-RETRYABLE_CODES = {500, 503}   # Gemini overloaded/internal: one quick retry (an LLM call has no side effects)
+RETRYABLE_CODES = {500, 503}   # Gemini overloaded/internal: one quick retry on the same model
 RETRY_DELAY_SECONDS = 1.5
+FALLBACK_CODES = {429, 404, 500, 503}
+COOLDOWN_SECONDS = {429: 60.0, 404: 3600.0, 500: 30.0, 503: 30.0}
+
+
+class ModelPool:
+    """Ordered models plus a shared cool-down, so one 429 moves every later chat to the next model."""
+
+    def __init__(self, models: list[str], *, clock: Callable[[], float] = time.monotonic):
+        self.models = [m for i, m in enumerate(models) if m and m not in models[:i]]
+        self._until: dict[str, float] = {}
+        self._clock = clock
+
+    def order(self, preferred: Optional[str] = None) -> list[str]:
+        now = self._clock()
+        ready = [m for m in self.models if self._until.get(m, 0.0) <= now]
+        cooling = [m for m in self.models if m not in ready]
+        ordered = ready + cooling             # all cooling: still try them rather than fail outright
+        if preferred in ready:
+            ordered.remove(preferred)
+            ordered.insert(0, preferred)
+        return ordered
+
+    def cool_down(self, model: str, code: int) -> None:
+        self._until[model] = self._clock() + COOLDOWN_SECONDS.get(code, 30.0)
 
 
 def unavailable_message(code: Optional[int]) -> str:
     """What the trader sees when Gemini fails, by HTTP code (google.genai errors carry `.code`)."""
     if code == 429:
-        return "The AI hit its Gemini request limit. Wait about a minute and try again."
+        return "The AI hit its Gemini request limit on every configured model. Wait about a minute and try again."
     if code in (401, 403):
         return "The AI key was rejected by Gemini. Check GEMINI_API_KEY on the server."
     if code == 404:
@@ -28,31 +58,48 @@ def unavailable_message(code: Optional[int]) -> str:
 
 
 class GeminiConversation:
-    def __init__(self, client: Any, model: str, config: Any, contents: list, *, sleep=asyncio.sleep):
+    def __init__(self, client: Any, model, config: Any, contents: list, *, sleep=asyncio.sleep):
         self._client = client
-        self._model = model
+        self._pool = model if isinstance(model, ModelPool) else ModelPool([model])
+        self._model = self._pool.models[0]     # the model that answered last; preferred for the next call
         self._config = config
         self._contents = contents
         self._sleep = sleep
 
-    async def _call(self):
-        return await self._client.aio.models.generate_content(model=self._model, contents=self._contents, config=self._config)
+    async def _call(self, model: str):
+        return await self._client.aio.models.generate_content(model=model, contents=self._contents, config=self._config)
+
+    async def _call_with_retry(self, model: str):
+        try:
+            return await self._call(model)
+        except Exception as exc:
+            if getattr(exc, "code", None) not in RETRYABLE_CODES:
+                raise
+            logger.info("Gemini %s returned %s; retrying once", model, getattr(exc, "code", None))
+            await self._sleep(RETRY_DELAY_SECONDS)
+            return await self._call(model)
 
     async def _generate(self) -> LLMTurn:
-        try:
+        last: Optional[Exception] = None
+        response = None
+        for model in self._pool.order(self._model):
             try:
-                response = await self._call()
+                response = await self._call_with_retry(model)
+                if model != self._model:
+                    logger.info("Gemini answered with fallback model %s", model)
+                self._model = model
+                break
             except Exception as exc:
-                if getattr(exc, "code", None) not in RETRYABLE_CODES:
-                    raise
-                logger.info("Gemini returned %s; retrying once", getattr(exc, "code", None))
-                await self._sleep(RETRY_DELAY_SECONDS)
-                response = await self._call()
-        except Exception as exc:
-            code = getattr(exc, "code", None)
-            logger.warning("Gemini call failed: %s code=%s status=%s message=%s", type(exc).__name__, code,
-                           getattr(exc, "status", None), str(getattr(exc, "message", "") or "")[:200])
-            raise LLMUnavailableError(unavailable_message(code if isinstance(code, int) else None), cause=exc) from exc
+                last = exc
+                code = getattr(exc, "code", None)
+                logger.warning("Gemini call failed: model=%s %s code=%s status=%s message=%s", model, type(exc).__name__,
+                               code, getattr(exc, "status", None), str(getattr(exc, "message", "") or "")[:200])
+                if code not in FALLBACK_CODES:
+                    break                       # e.g. 400 bad request or 403 bad key: another model won't help
+                self._pool.cool_down(model, code)
+        if response is None:
+            code = getattr(last, "code", None)
+            raise LLMUnavailableError(unavailable_message(code if isinstance(code, int) else None), cause=last) from last
 
         candidate = (response.candidates or [None])[0]
         if candidate is None or candidate.content is None:
@@ -85,9 +132,9 @@ class GeminiConversation:
 
 
 class GeminiLLM:
-    def __init__(self, api_key: str, model: str, *, temperature: float = 0.1):
+    def __init__(self, api_key: str, model: str, *, fallbacks: Optional[list[str]] = None, temperature: float = 0.1):
         self._api_key = api_key
-        self._model = model
+        self._pool = ModelPool([model, *(fallbacks or [])])
         self._temperature = temperature
         self._client: Optional[Any] = None
 
@@ -118,4 +165,4 @@ class GeminiLLM:
             types.Content(role="model" if role == "assistant" else "user", parts=[types.Part.from_text(text=text)])
             for role, text in history
         ]
-        return GeminiConversation(client, self._model, config, contents)
+        return GeminiConversation(client, self._pool, config, contents)

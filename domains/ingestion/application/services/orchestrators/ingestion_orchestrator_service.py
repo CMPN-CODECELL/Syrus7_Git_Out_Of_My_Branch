@@ -15,6 +15,9 @@ import logging
 import os
 import time
 
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
+
 from shared.constants import StreamGroups, Streams
 from shared.infrastructure.event_bus.streams import DurableEventStream, StreamMessage
 from shared.infrastructure.redis_client import get_redis_client
@@ -24,6 +27,7 @@ logger = logging.getLogger("ingestion_orchestrator")
 _CONSUMER_NAME = os.getenv("INGESTION_ORCH_CONSUMER_NAME", "ingestion-orch-1")
 _GROUP = StreamGroups.REFRESH_TO_INGESTION
 _COOLDOWN_SECONDS = int(os.getenv("INGESTION_REFRESH_COOLDOWN", "60"))
+_READ_RETRY_SECONDS = 2
 
 
 async def main() -> None:
@@ -35,13 +39,19 @@ async def main() -> None:
     await stream_bus.ensure_group(Streams.ANALYSIS_REFRESH_REQUESTED, _GROUP)
 
     while True:
-        messages = await stream_bus.read_group(
-            group=_GROUP,
-            consumer=_CONSUMER_NAME,
-            streams=[Streams.ANALYSIS_REFRESH_REQUESTED],
-            count=20,
-            block_ms=5000,
-        )
+        try:
+            messages = await stream_bus.read_group(
+                group=_GROUP,
+                consumer=_CONSUMER_NAME,
+                streams=[Streams.ANALYSIS_REFRESH_REQUESTED],
+                count=20,
+                block_ms=5000,
+            )
+        except (RedisTimeoutError, RedisConnectionError) as exc:
+            # Transient: keep the consumer alive instead of crashing into a supervisor restart loop.
+            logger.warning("Redis read failed (%s); retrying in %ss", exc, _READ_RETRY_SECONDS)
+            await asyncio.sleep(_READ_RETRY_SECONDS)
+            continue
 
         for message in messages:
             await _handle_refresh(stream_bus, message)

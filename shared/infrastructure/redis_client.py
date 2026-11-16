@@ -44,6 +44,9 @@ async def get_redis_client() -> aioredis.Redis:
             decode_responses=True,
             max_connections=50,
             socket_connect_timeout=5,
+            # Must exceed every blocking read (XREADGROUP block_ms <= 5s); redis-py 8 defaults to 5s,
+            # which races the server's empty reply and raises TimeoutError in idle stream consumers.
+            socket_timeout=30,
             socket_keepalive=True,
             retry_on_timeout=True,
         )

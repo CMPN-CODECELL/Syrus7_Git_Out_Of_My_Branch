@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     GeminiApiKey: str = Field("", validation_alias="GEMINI_API_KEY")
     GeminiModel: str  = Field("gemini-3.5-flash", validation_alias="GEMINI_MODEL")
     # Tried in order when the main model is rate-limited (429) or unavailable; quotas are per model.
-    GeminiFallbackModels: str = Field("gemini-3.6-flash,gemini-3.5-flash,gemini-flash-lite-latest",
+    GeminiFallbackModels: str = Field("gemini-3.5-flash-lite,gemini-2.5-flash",
                                       validation_alias="GEMINI_FALLBACK_MODELS")
     ChatMaxMessageChars: int = Field(1000, validation_alias="CHAT_MAX_MESSAGE_CHARS")
     ChatRateLimitPerMinute: int = Field(20, validation_alias="CHAT_RATE_LIMIT_PER_MINUTE")

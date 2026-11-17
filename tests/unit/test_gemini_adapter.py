@@ -1,4 +1,5 @@
 """Gemini adapter error handling, with a fake client (never calls Google)."""
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +12,9 @@ class ApiError(Exception):
     def __init__(self, code):
         super().__init__(f"HTTP {code}")
         self.code, self.status, self.message = code, "STATUS", f"HTTP {code}"
+
+
+HANG = object()
 
 
 class FakeModels:
@@ -26,6 +30,8 @@ class FakeModels:
         self.models_called.append(model)
         queue = self.outcomes.get(model, self.outcomes.get(None))
         outcome = queue.pop(0)
+        if outcome is HANG:
+            await asyncio.sleep(60)                 # an overloaded model holding the request open
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
@@ -95,6 +101,25 @@ async def test_every_model_limited_gives_the_limit_message():
     pool = ModelPool(["main", "backup"])
     conv, _ = conversation({"main": [ApiError(429)], "backup": [ApiError(429)]}, model=pool)
     with pytest.raises(LLMUnavailableError, match="every configured model"):
+        await conv._generate()
+
+
+async def test_hanging_model_times_out_and_falls_back_without_retry():
+    pool = ModelPool(["main", "backup"])
+    models = FakeModels({"main": [HANG], "backup": [ok_response("from backup")]})
+    client = SimpleNamespace(aio=SimpleNamespace(models=models))
+    conv = GeminiConversation(client, pool, None, [], sleep=no_sleep, call_timeout=0.05)
+    assert (await conv._generate()).text == "from backup"
+    assert models.models_called == ["main", "backup"]
+    assert pool.order() == ["backup", "main"]                          # hung model is cooling down
+
+
+async def test_every_model_hanging_gives_a_timeout_message():
+    pool = ModelPool(["main", "backup"])
+    models = FakeModels({"main": [HANG], "backup": [HANG]})
+    client = SimpleNamespace(aio=SimpleNamespace(models=models))
+    conv = GeminiConversation(client, pool, None, [], sleep=no_sleep, call_timeout=0.05)
+    with pytest.raises(LLMUnavailableError, match="did not answer in time"):
         await conv._generate()
 
 

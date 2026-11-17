@@ -131,3 +131,16 @@ async def test_paper_trading_l2_order_draft_and_approve(paper_runtime):
 
     finally:
         await paper_runtime.stop()
+
+
+def test_order_ids_do_not_repeat_across_restarts():
+    """The order journal outlives the process, so a fresh PaperBroker must not reuse earlier order IDs."""
+    import time as _time
+    from domains.broker.infrastructure.paper_broker import PaperBroker
+
+    first_run = PaperBroker(instruments_path=None)
+    earlier_ids = [next(first_run._order_seq) for _ in range(5)]
+    _time.sleep(0.01)
+    second_run = PaperBroker(instruments_path=None)
+    assert next(second_run._order_seq) > max(earlier_ids) > 1001
+    assert next(PaperBroker(instruments_path=None, first_order_id=1001)._order_seq) == 1001

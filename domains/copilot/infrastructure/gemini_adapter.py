@@ -18,8 +18,22 @@ logger = logging.getLogger(__name__)
 
 RETRYABLE_CODES = {500, 503}   # Gemini overloaded/internal: one quick retry on the same model
 RETRY_DELAY_SECONDS = 1.5
-FALLBACK_CODES = {429, 404, 500, 503}
-COOLDOWN_SECONDS = {429: 60.0, 404: 3600.0, 500: 30.0, 503: 30.0}
+# An overloaded model can hold the request open indefinitely instead of returning 503; cap each
+# call so the chat falls through to the next model rather than hanging the trader's request.
+CALL_TIMEOUT_SECONDS = 25.0
+TIMEOUT_CODE = 504
+FALLBACK_CODES = {429, 404, 500, 503, TIMEOUT_CODE}
+COOLDOWN_SECONDS = {429: 60.0, 404: 3600.0, 500: 30.0, 503: 30.0, TIMEOUT_CODE: 60.0}
+
+
+class GeminiTimeoutError(Exception):
+    """A Gemini call exceeded CALL_TIMEOUT_SECONDS. Carries `.code` like google.genai errors."""
+
+    code = TIMEOUT_CODE
+
+    def __init__(self, model: str, seconds: float):
+        super().__init__(f"{model} did not answer within {seconds:.0f}s")
+        self.message = str(self)
 
 
 class ModelPool:
@@ -52,22 +66,32 @@ def unavailable_message(code: Optional[int]) -> str:
         return "The AI key was rejected by Gemini. Check GEMINI_API_KEY on the server."
     if code == 404:
         return "The configured Gemini model was not found. Check GEMINI_MODEL on the server."
+    if code == TIMEOUT_CODE:
+        return "Gemini is overloaded and did not answer in time on any configured model. Try again in a moment."
     if code is not None and code >= 500:
         return "Gemini is having trouble right now. Try again in a moment."
     return "The language model is unavailable right now."
 
 
 class GeminiConversation:
-    def __init__(self, client: Any, model, config: Any, contents: list, *, sleep=asyncio.sleep):
+    def __init__(self, client: Any, model, config: Any, contents: list, *, sleep=asyncio.sleep,
+                 call_timeout: float = CALL_TIMEOUT_SECONDS):
         self._client = client
         self._pool = model if isinstance(model, ModelPool) else ModelPool([model])
         self._model = self._pool.models[0]     # the model that answered last; preferred for the next call
         self._config = config
         self._contents = contents
         self._sleep = sleep
+        self._call_timeout = call_timeout
 
     async def _call(self, model: str):
-        return await self._client.aio.models.generate_content(model=model, contents=self._contents, config=self._config)
+        try:
+            return await asyncio.wait_for(
+                self._client.aio.models.generate_content(model=model, contents=self._contents, config=self._config),
+                timeout=self._call_timeout,
+            )
+        except asyncio.TimeoutError:
+            raise GeminiTimeoutError(model, self._call_timeout) from None
 
     async def _call_with_retry(self, model: str):
         try:

@@ -41,12 +41,16 @@ class PaperBroker:
         ucc: str = _DEFAULT_UCC,
         password: str = _DEFAULT_PASSWORD,
         instruments_path: Optional[str] = "data/instruments.csv.gz",
+        first_order_id: Optional[int] = None,
     ):
         self.ucc = ucc
         self.password = password
         self.instruments_path = instruments_path
         self._token_seq = itertools.count(1)
-        self._order_seq = itertools.count(1001)
+        # The order journal persists in Postgres across restarts and order_id is unique there, so a
+        # fixed start (e.g. 1001) collides with orders from an earlier run. Start from the current
+        # epoch milliseconds: each run's IDs begin above every ID a previous run could have issued.
+        self._order_seq = itertools.count(first_order_id if first_order_id is not None else int(time.time() * 1000))
         self._trade_seq = itertools.count(1)
         self.current_token: Optional[str] = None
         self.logins = 0
